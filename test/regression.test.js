@@ -123,8 +123,19 @@ test("MediaService preserves stable HQ/LQ profile tokens and stream URIs", async
     assert.equal(media.profileTokenHq, "profile_hq_020000000005");
     assert.equal(media.profileTokenLq, "profile_lq_020000000005");
 
-    const hq = await media.GetStreamUri({ ProfileToken: media.profileTokenHq });
-    const lq = await media.GetStreamUri({ ProfileToken: media.profileTokenLq });
+    const streamSetup = {
+        Stream: "RTP-Unicast",
+        Transport: { Protocol: "RTSP" }
+    };
+
+    const hq = await media.GetStreamUri({
+        StreamSetup: streamSetup,
+        ProfileToken: media.profileTokenHq
+    });
+    const lq = await media.GetStreamUri({
+        StreamSetup: streamSetup,
+        ProfileToken: media.profileTokenLq
+    });
 
     assert.equal(
         hq.MediaUri.Uri,
