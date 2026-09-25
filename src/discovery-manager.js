@@ -15,6 +15,7 @@ class DiscoveryManager {
         this.listenSocket = null;
         this.listeningReadyPromise = null;
         this.recentProbes = [];
+        this.recentResolves = [];
         this.instanceId = Math.floor(Date.now() / 1000);
         this.messageNumber = 0;
     }
@@ -221,8 +222,10 @@ class DiscoveryManager {
 
     handleMessage(msg, rinfo) {
         const xml = msg.toString("utf8");
+        const isProbe = this.hasDiscoveryElement(xml, "Probe");
+        const isResolve = this.hasDiscoveryElement(xml, "Resolve");
 
-        if (!xml.includes("<d:Probe") && !xml.includes("<Probe")) {
+        if (!isProbe && !isResolve) {
             return;
         }
 
@@ -232,6 +235,12 @@ class DiscoveryManager {
         }
 
         const relatesTo = this.extractMessageId(xml);
+
+        if (isResolve) {
+            this.handleResolve(xml, relatesTo, rinfo, activeEntries);
+            return;
+        }
+
         if (this.isDuplicateProbe(relatesTo, xml, rinfo)) {
             logger.debug("discovery", `Skipping shared duplicate Probe from ${rinfo.address}:${rinfo.port} ` + `(messageId=${relatesTo || "<missing>"})`);
             return;
@@ -261,6 +270,31 @@ class DiscoveryManager {
         }
     }
 
+    handleResolve(xml, relatesTo, rinfo, activeEntries) {
+        const endpointAddress = this.extractResolveAddress(xml);
+        if (!endpointAddress) {
+            logger.debug("discovery", `Ignoring WS-Discovery Resolve from ${rinfo.address}:${rinfo.port} with no endpoint address`);
+            return;
+        }
+
+        if (this.isDuplicateResolve(relatesTo, xml, rinfo)) {
+            logger.debug("discovery", `Skipping shared duplicate Resolve from ${rinfo.address}:${rinfo.port} ` + `(messageId=${relatesTo || "<missing>"}, endpoint=${endpointAddress})`);
+            return;
+        }
+
+        const entry = activeEntries.find((candidate) =>
+            candidate.endpointAddress.toLowerCase() === endpointAddress.toLowerCase()
+        );
+
+        if (!entry) {
+            logger.debug("discovery", `Ignoring WS-Discovery Resolve for unknown endpoint ${endpointAddress} ` + `from ${rinfo.address}:${rinfo.port}`);
+            return;
+        }
+
+        logger.debug("discovery", `WS-Discovery Resolve matched ${entry.camera.name} from ${rinfo.address}:${rinfo.port} ` + `(messageId=${relatesTo || "<missing>"}, endpoint=${endpointAddress})`);
+
+        this.sendResolveMatch(entry, relatesTo, rinfo);
+    }
     sendProbeMatch(entry, relatesTo, rinfo) {
         const responseXml = this.buildProbeMatchesResponse(entry, relatesTo);
         const buf = Buffer.from(responseXml, "utf8");
@@ -282,6 +316,26 @@ class DiscoveryManager {
         });
     }
 
+    sendResolveMatch(entry, relatesTo, rinfo) {
+        const responseXml = this.buildResolveMatchesResponse(entry, relatesTo);
+        const buf = Buffer.from(responseXml, "utf8");
+
+        if (!entry.responseSocket) {
+            logger.warn(`Skipping ResolveMatches for ${entry.camera.name}; response socket is not available`);
+            return;
+        }
+
+        entry.responseSocket.send(buf, 0, buf.length, rinfo.port, rinfo.address, (err) => {
+            if (err) {
+                logger.error(`Failed to send ResolveMatches for ${entry.camera.name} to ${rinfo.address}:${rinfo.port} - ${err.message}`);
+            } else {
+                logger.debug("discovery",
+                    `ResolveMatches sent for ${entry.camera.name} to ${rinfo.address}:${rinfo.port} ` +
+                    `(endpoint=${entry.endpointAddress}, xaddr=${entry.xaddr}, mac=${entry.camera.mac}, ip=${entry.camera.ip})`
+                );
+            }
+        });
+    }
     getReplyDelayMs(activeCameraCount) {
         if (activeCameraCount <= 1) {
             return 0;
@@ -304,6 +358,23 @@ class DiscoveryManager {
         }
 
         this.recentProbes.push({ key, seenAt: now });
+        return false;
+    }
+
+    isDuplicateResolve(messageId, xml, rinfo) {
+        const now = Date.now();
+        const fallbackId = crypto.createHash("sha1").update(xml, "utf8").digest("hex");
+        const key = `${rinfo.address}|${rinfo.port}|${messageId || fallbackId}`;
+
+        this.recentResolves = this.recentResolves
+            .filter((resolve) => now - resolve.seenAt <= DUPLICATE_WINDOW_MS)
+            .slice(-(MAX_RECENT_PROBES - 1));
+
+        if (this.recentResolves.some((resolve) => resolve.key === key)) {
+            return true;
+        }
+
+        this.recentResolves.push({ key, seenAt: now });
         return false;
     }
 
@@ -367,6 +438,44 @@ class DiscoveryManager {
 </SOAP-ENV:Envelope>`.trim();
     }
 
+    buildResolveMatchesResponse(entry, relatesTo) {
+        const appSequence = this.nextAppSequence();
+
+        return `
+<SOAP-ENV:Envelope
+    xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope"
+    xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+    xmlns:wsd="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+    xmlns:tds="http://www.onvif.org/ver10/device/wsdl"
+    xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
+  <SOAP-ENV:Header>
+    <wsa:MessageID>${this.generateMessageId()}</wsa:MessageID>
+    ${relatesTo ? `<wsa:RelatesTo>${relatesTo}</wsa:RelatesTo>` : ""}
+    <wsa:To SOAP-ENV:mustUnderstand="true">
+      http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous
+    </wsa:To>
+    <wsa:Action SOAP-ENV:mustUnderstand="true">
+      http://schemas.xmlsoap.org/ws/2005/04/discovery/ResolveMatches
+    </wsa:Action>
+    <wsd:AppSequence SOAP-ENV:mustUnderstand="true" InstanceId="${appSequence.instanceId}" MessageNumber="${appSequence.messageNumber}" />
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <wsd:ResolveMatches>
+      <wsd:ResolveMatch>
+        <wsa:EndpointReference>
+          <wsa:Address>${entry.endpointAddress}</wsa:Address>
+        </wsa:EndpointReference>
+        <wsd:Types>tds:Device dn:NetworkVideoTransmitter</wsd:Types>
+        <wsd:Scopes>
+          ${this.getDiscoveryScopes(entry.camera)}
+        </wsd:Scopes>
+        <wsd:XAddrs>${entry.xaddr}</wsd:XAddrs>
+        <wsd:MetadataVersion>1</wsd:MetadataVersion>
+      </wsd:ResolveMatch>
+    </wsd:ResolveMatches>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`.trim();
+    }
     generateMessageId() {
         return `urn:uuid:${crypto.randomUUID()}`;
     }
@@ -380,6 +489,20 @@ class DiscoveryManager {
         };
     }
 
+    hasDiscoveryElement(xml, localName) {
+        const pattern = new RegExp(`<(?:(?:[A-Za-z_][\\w.-]*):)?${localName}(?:\\s|>)`, "i");
+        return pattern.test(xml);
+    }
+
+    extractResolveAddress(xml) {
+        const resolveMatch = xml.match(/<(?:[A-Za-z_][\\w.-]*:)?Resolve\\b[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?Resolve>/i);
+        if (!resolveMatch) {
+            return null;
+        }
+
+        const addressMatch = resolveMatch[1].match(/<(?:[A-Za-z_][\\w.-]*:)?Address\\b[^>]*>([^<]+)<\\/(?:[A-Za-z_][\\w.-]*:)?Address>/i);
+        return addressMatch ? addressMatch[1].trim() : null;
+    }
     extractMessageId(xml) {
         const match = xml.match(/<[^:>]*:?MessageID[^>]*>([^<]+)<\/[^:>]*:?MessageID>/i);
         return match ? match[1].trim() : null;
