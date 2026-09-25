@@ -8,6 +8,8 @@ const DISCOVERY_PORT = 3702;
 const MAX_REPLY_JITTER_MS = 75;
 const DUPLICATE_WINDOW_MS = 50;
 const MAX_RECENT_PROBES = 50;
+const HELLO_MAX_DELAY_MS = 500;
+const DISCOVERY_TO = "urn:schemas-xmlsoap-org:ws:2005:04:discovery";
 
 class DiscoveryManager {
     constructor() {
@@ -54,7 +56,8 @@ class DiscoveryManager {
             responseSocket: null,
             running: false,
             endpointAddress: this.buildEndpointAddress(camera),
-            xaddr: this.buildXAddr(camera)
+            xaddr: this.buildXAddr(camera),
+            helloTimer: null
         };
     }
 
@@ -121,6 +124,7 @@ class DiscoveryManager {
 
                 logger.debug("discovery", `WS-Discovery registered for ${entry.camera.name} on 0.0.0.0:${DISCOVERY_PORT} ` + `(reply source ${entry.camera.ip}, XAddr: ${entry.xaddr})`);
 
+                this.scheduleHello(entry);
                 resolveStartup();
             });
         });
@@ -134,6 +138,11 @@ class DiscoveryManager {
                 return;
             }
 
+            if (entry.helloTimer) {
+                clearTimeout(entry.helloTimer);
+                entry.helloTimer = null;
+            }
+
             const finalizeStop = () => {
                 logger.info(`WS-Discovery stopped for ${entry.camera.name} on ${entry.camera.ip}`);
                 entry.running = false;
@@ -142,23 +151,26 @@ class DiscoveryManager {
                 resolve();
             };
 
-            try {
-                this.listenSocket?.dropMembership(MULTICAST_ADDRESS, entry.camera.ip);
-            } catch (err) {
-                logger.warn(`Failed to leave multicast group on ${entry.camera.ip} for ${entry.camera.name}: ${err.message}`);
-            }
+            const closeSockets = () => {
+                try {
+                    this.listenSocket?.dropMembership(MULTICAST_ADDRESS, entry.camera.ip);
+                } catch (err) {
+                    logger.warn(`Failed to leave multicast group on ${entry.camera.ip} for ${entry.camera.name}: ${err.message}`);
+                }
 
-            if (!entry.responseSocket) {
-                this.closeListeningSocketIfIdle().finally(finalizeStop);
-                return;
-            }
+                if (!entry.responseSocket) {
+                    this.closeListeningSocketIfIdle().finally(finalizeStop);
+                    return;
+                }
 
-            entry.responseSocket.close(() => {
-                this.closeListeningSocketIfIdle().finally(finalizeStop);
-            });
+                entry.responseSocket.close(() => {
+                    this.closeListeningSocketIfIdle().finally(finalizeStop);
+                });
+            };
+
+            this.sendBye(entry).finally(closeSockets);
         });
     }
-
     ensureListeningSocket() {
         if (this.listenSocket) {
             return this.listeningReadyPromise || Promise.resolve();
@@ -336,6 +348,59 @@ class DiscoveryManager {
             }
         });
     }
+    getHelloDelayMs() {
+        return Math.floor(Math.random() * (HELLO_MAX_DELAY_MS + 1));
+    }
+
+    scheduleHello(entry) {
+        const delayMs = this.getHelloDelayMs();
+
+        if (entry.helloTimer) {
+            clearTimeout(entry.helloTimer);
+        }
+
+        entry.helloTimer = setTimeout(() => {
+            entry.helloTimer = null;
+
+            if (!entry.running) {
+                return;
+            }
+
+            this.sendHello(entry);
+        }, delayMs);
+
+        logger.debug("discovery", `Scheduled Hello for ${entry.camera.name} in ${delayMs}ms`);
+    }
+
+    sendHello(entry) {
+        return this.sendAnnouncement(entry, this.buildHelloMessage(entry), "Hello");
+    }
+
+    sendBye(entry) {
+        return this.sendAnnouncement(entry, this.buildByeMessage(entry), "Bye");
+    }
+
+    sendAnnouncement(entry, xml, kind) {
+        return new Promise((resolve) => {
+            if (!entry.responseSocket) {
+                logger.warn(`Skipping ${kind} for ${entry.camera.name}; response socket is not available`);
+                resolve(false);
+                return;
+            }
+
+            const buf = Buffer.from(xml, "utf8");
+            entry.responseSocket.send(buf, 0, buf.length, DISCOVERY_PORT, MULTICAST_ADDRESS, (err) => {
+                if (err) {
+                    logger.warn(`Failed to send ${kind} for ${entry.camera.name}: ${err.message}`);
+                    resolve(false);
+                    return;
+                }
+
+                logger.debug("discovery", `${kind} sent for ${entry.camera.name} from ${entry.camera.ip}`);
+                resolve(true);
+            });
+        });
+    }
     getReplyDelayMs(activeCameraCount) {
         if (activeCameraCount <= 1) {
             return 0;
@@ -473,6 +538,61 @@ class DiscoveryManager {
         <wsd:MetadataVersion>1</wsd:MetadataVersion>
       </wsd:ResolveMatch>
     </wsd:ResolveMatches>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`.trim();
+    }
+    buildHelloMessage(entry) {
+        const appSequence = this.nextAppSequence();
+
+        return `
+<SOAP-ENV:Envelope
+    xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope"
+    xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+    xmlns:wsd="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+    xmlns:tds="http://www.onvif.org/ver10/device/wsdl"
+    xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
+  <SOAP-ENV:Header>
+    <wsa:Action SOAP-ENV:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2005/04/discovery/Hello</wsa:Action>
+    <wsa:MessageID>${this.generateMessageId()}</wsa:MessageID>
+    <wsa:To SOAP-ENV:mustUnderstand="true">${DISCOVERY_TO}</wsa:To>
+    <wsd:AppSequence SOAP-ENV:mustUnderstand="true" InstanceId="${appSequence.instanceId}" MessageNumber="${appSequence.messageNumber}" />
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <wsd:Hello>
+      <wsa:EndpointReference>
+        <wsa:Address>${entry.endpointAddress}</wsa:Address>
+      </wsa:EndpointReference>
+      <wsd:Types>tds:Device dn:NetworkVideoTransmitter</wsd:Types>
+      <wsd:Scopes>
+        ${this.getDiscoveryScopes(entry.camera)}
+      </wsd:Scopes>
+      <wsd:XAddrs>${entry.xaddr}</wsd:XAddrs>
+      <wsd:MetadataVersion>1</wsd:MetadataVersion>
+    </wsd:Hello>
+  </SOAP-ENV:Body>
+</SOAP-ENV:Envelope>`.trim();
+    }
+
+    buildByeMessage(entry) {
+        const appSequence = this.nextAppSequence();
+
+        return `
+<SOAP-ENV:Envelope
+    xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope"
+    xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
+    xmlns:wsd="http://schemas.xmlsoap.org/ws/2005/04/discovery">
+  <SOAP-ENV:Header>
+    <wsa:Action SOAP-ENV:mustUnderstand="true">http://schemas.xmlsoap.org/ws/2005/04/discovery/Bye</wsa:Action>
+    <wsa:MessageID>${this.generateMessageId()}</wsa:MessageID>
+    <wsa:To SOAP-ENV:mustUnderstand="true">${DISCOVERY_TO}</wsa:To>
+    <wsd:AppSequence SOAP-ENV:mustUnderstand="true" InstanceId="${appSequence.instanceId}" MessageNumber="${appSequence.messageNumber}" />
+  </SOAP-ENV:Header>
+  <SOAP-ENV:Body>
+    <wsd:Bye>
+      <wsa:EndpointReference>
+        <wsa:Address>${entry.endpointAddress}</wsa:Address>
+      </wsa:EndpointReference>
+    </wsd:Bye>
   </SOAP-ENV:Body>
 </SOAP-ENV:Envelope>`.trim();
     }
