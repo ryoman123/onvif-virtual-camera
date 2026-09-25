@@ -109,6 +109,38 @@ class MediaService {
         throw faults.noConfig();
     }
 
+    buildVideoSourceConfiguration(profile) {
+        return {
+            $attributes: {
+                token: profile.videoSourceConfigToken
+            },
+            Name: profile.videoSourceConfigName,
+            UseCount: 1,
+            SourceToken: this.videoSourceToken
+        };
+    }
+
+    buildVideoEncoderConfiguration(profile) {
+        return {
+            $attributes: {
+                token: profile.videoEncoderToken
+            },
+            Name: profile.videoEncoderConfigName,
+            UseCount: 1,
+            Encoding: profile.stream.encoding,
+            Resolution: {
+                Width: profile.stream.width,
+                Height: profile.stream.height
+            },
+            Quality: profile.stream.quality,
+            RateControl: {
+                FrameRateLimit: profile.stream.framerate,
+                EncodingInterval: 1,
+                BitrateLimit: profile.stream.bitrate
+            }
+        };
+    }
+
     buildProfile(profile) {
         return {
             $attributes: {
@@ -116,35 +148,30 @@ class MediaService {
                 fixed: true
             },
             Name: profile.profileName,
-            VideoSourceConfiguration: {
-                $attributes: {
-                    token: profile.videoSourceConfigToken
-                },
-                Name: profile.videoSourceConfigName,
-                UseCount: 1,
-                SourceToken: this.videoSourceToken
-            },
-            VideoEncoderConfiguration: {
-                $attributes: {
-                    token: profile.videoEncoderToken
-                },
-                Name: profile.videoEncoderConfigName,
-                UseCount: 1,
-                Encoding: profile.stream.encoding,
-                Resolution: {
-                    Width: profile.stream.width,
-                    Height: profile.stream.height
-                },
-                Quality: profile.stream.quality,
-                RateControl: {
-                    FrameRateLimit: profile.stream.framerate,
-                    EncodingInterval: 1,
-                    BitrateLimit: profile.stream.bitrate
-                }
-            }
+            VideoSourceConfiguration: this.buildVideoSourceConfiguration(profile),
+            VideoEncoderConfiguration: this.buildVideoEncoderConfiguration(profile)
         };
     }
 
+    buildVideoEncoderConfigurationOptions(profile) {
+        const streams = profile
+            ? [profile.stream]
+            : [this.camera.streams.hq, this.camera.streams.lq];
+
+        const qualityValues = streams
+            .map((stream) => Number(stream.quality))
+            .filter((value) => Number.isFinite(value));
+
+        const minimumQuality = qualityValues.length > 0 ? Math.min(...qualityValues) : 0;
+        const maximumQuality = qualityValues.length > 0 ? Math.max(...qualityValues) : 0;
+
+        return {
+            QualityRange: {
+                Min: minimumQuality,
+                Max: maximumQuality
+            }
+        };
+    }
     // ONVIF: GetProfiles
     async GetProfiles() {
         const profiles = [
@@ -159,6 +186,19 @@ class MediaService {
         };
     }
 
+    // ONVIF: GetProfile
+    async GetProfile(args) {
+        const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
+
+        logger.debug("media",
+            `GetProfile called for ${this.camera.name} ` +
+            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind})`
+        );
+
+        return {
+            Profile: this.buildProfile(profile)
+        };
+    }
     // ONVIF: GetStreamUri
     async GetStreamUri(args) {
         const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
@@ -246,6 +286,35 @@ class MediaService {
         };
     }
 
+    // ONVIF: GetVideoSourceConfigurations
+    async GetVideoSourceConfigurations() {
+        const configurations = [
+            this.buildVideoSourceConfiguration(this.getProfileDefinition("hq")),
+            this.buildVideoSourceConfiguration(this.getProfileDefinition("lq"))
+        ];
+
+        logger.debug("media", `GetVideoSourceConfigurations called for ${this.camera.name}`);
+
+        return {
+            Configurations: configurations
+        };
+    }
+
+    // ONVIF: GetCompatibleVideoSourceConfigurations
+    async GetCompatibleVideoSourceConfigurations(args) {
+        const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
+
+        logger.debug("media",
+            `GetCompatibleVideoSourceConfigurations called for ${this.camera.name} ` +
+            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind})`
+        );
+
+        return {
+            Configurations: [
+                this.buildVideoSourceConfiguration(profile)
+            ]
+        };
+    }
     // ONVIF: GetVideoEncoderConfiguration
     async GetVideoEncoderConfiguration(args) {
         const profile = this.getProfileDefinitionByVideoEncoderConfigurationToken(
@@ -279,14 +348,81 @@ class MediaService {
         };
     }
 
+    // ONVIF: GetVideoEncoderConfigurations
+    async GetVideoEncoderConfigurations() {
+        const configurations = [
+            this.buildVideoEncoderConfiguration(this.getProfileDefinition("hq")),
+            this.buildVideoEncoderConfiguration(this.getProfileDefinition("lq"))
+        ];
+
+        logger.debug("media", `GetVideoEncoderConfigurations called for ${this.camera.name}`);
+
+        return {
+            Configurations: configurations
+        };
+    }
+
+    // ONVIF: GetCompatibleVideoEncoderConfigurations
+    async GetCompatibleVideoEncoderConfigurations(args) {
+        const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
+
+        logger.debug("media",
+            `GetCompatibleVideoEncoderConfigurations called for ${this.camera.name} ` +
+            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind})`
+        );
+
+        return {
+            Configurations: [
+                this.buildVideoEncoderConfiguration(profile)
+            ]
+        };
+    }
+
+    // ONVIF: GetVideoEncoderConfigurationOptions
+    async GetVideoEncoderConfigurationOptions(args) {
+        let configurationProfile = null;
+        let mediaProfile = null;
+
+        if (args && args.ConfigurationToken !== undefined && args.ConfigurationToken !== null && args.ConfigurationToken !== "") {
+            configurationProfile = this.getProfileDefinitionByVideoEncoderConfigurationToken(
+                args.ConfigurationToken
+            );
+        }
+
+        if (args && args.ProfileToken !== undefined && args.ProfileToken !== null && args.ProfileToken !== "") {
+            mediaProfile = this.getProfileDefinitionByToken(args.ProfileToken);
+        }
+
+        if (configurationProfile && mediaProfile && configurationProfile.kind !== mediaProfile.kind) {
+            throw faults.invalidArgs();
+        }
+
+        const profile = configurationProfile || mediaProfile;
+
+        logger.debug("media",
+            `GetVideoEncoderConfigurationOptions called for ${this.camera.name} ` +
+            `(ConfigurationToken=${args && args.ConfigurationToken}, ProfileToken=${args && args.ProfileToken}, ` +
+            `kind=${profile ? profile.kind : "generic"})`
+        );
+
+        return {
+            Options: this.buildVideoEncoderConfigurationOptions(profile)
+        };
+    }
     GetServiceDefinition() {
         return {
             GetProfiles: this.GetProfiles.bind(this),
+            GetProfile: this.GetProfile.bind(this),
             GetStreamUri: this.GetStreamUri.bind(this),
             GetSnapshotUri: this.GetSnapshotUri.bind(this),
             GetVideoSources: this.GetVideoSources.bind(this),
             GetVideoSourceConfiguration: this.GetVideoSourceConfiguration.bind(this),
-            GetVideoEncoderConfiguration: this.GetVideoEncoderConfiguration.bind(this)
+            GetVideoSourceConfigurations: this.GetVideoSourceConfigurations.bind(this),
+            GetCompatibleVideoSourceConfigurations: this.GetCompatibleVideoSourceConfigurations.bind(this),
+            GetVideoEncoderConfiguration: this.GetVideoEncoderConfiguration.bind(this),
+            GetVideoEncoderConfigurations: this.GetVideoEncoderConfigurations.bind(this),
+            GetCompatibleVideoEncoderConfigurations: this.GetCompatibleVideoEncoderConfigurations.bind(this),
+            GetVideoEncoderConfigurationOptions: this.GetVideoEncoderConfigurationOptions.bind(this)
         };
     }
 }
