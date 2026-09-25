@@ -105,6 +105,29 @@ function matchesTypes(types) {
 }
 
 function normalizeScopeUri(value) {
+    const rawMatch = String(value).match(
+        /^[A-Za-z][A-Za-z0-9+.-]*:\/\/[^/?#]*(\/[^?#]*)?/
+    );
+
+    if (!rawMatch) {
+        return null;
+    }
+
+    const rawSegments = (rawMatch[1] || "").split("/").filter((segment, index, list) =>
+        segment !== "" || (index !== 0 && index !== list.length - 1)
+    );
+
+    let rawDecoded;
+    try {
+        rawDecoded = rawSegments.map((segment) => decodeURIComponent(segment));
+    } catch (_) {
+        return null;
+    }
+
+    if (rawDecoded.some((segment) => segment === "." || segment === "..")) {
+        return null;
+    }
+
     let url;
 
     try {
@@ -127,10 +150,6 @@ function normalizeScopeUri(value) {
     try {
         decoded = segments.map((segment) => decodeURIComponent(segment));
     } catch (_) {
-        return null;
-    }
-
-    if (decoded.some((segment) => segment === "." || segment === "..")) {
         return null;
     }
 
