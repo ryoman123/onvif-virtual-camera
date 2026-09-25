@@ -11,6 +11,45 @@
     <wsdl:types>
         <xs:schema targetNamespace="http://www.onvif.org/ver10/media/wsdl" elementFormDefault="qualified">
             <xs:import namespace="http://www.onvif.org/ver10/schema" schemaLocation="types.xsd"/>
+            <xs:complexType name="ProfileCapabilities">
+                <xs:sequence/>
+                <xs:attribute name="MaximumNumberOfProfiles" type="xs:int"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:complexType name="StreamingCapabilities">
+                <xs:sequence/>
+                <xs:attribute name="RTPMulticast" type="xs:boolean"/>
+                <xs:attribute name="RTP_TCP" type="xs:boolean"/>
+                <xs:attribute name="RTP_RTSP_TCP" type="xs:boolean"/>
+                <xs:attribute name="NonAggregateControl" type="xs:boolean"/>
+                <xs:attribute name="NoRTSPStreaming" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:complexType name="Capabilities">
+                <xs:sequence>
+                    <xs:element name="ProfileCapabilities" type="trt:ProfileCapabilities"/>
+                    <xs:element name="StreamingCapabilities" type="trt:StreamingCapabilities"/>
+                    <xs:any namespace="##any" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                </xs:sequence>
+                <xs:attribute name="SnapshotUri" type="xs:boolean"/>
+                <xs:attribute name="Rotation" type="xs:boolean"/>
+                <xs:attribute name="VideoSourceMode" type="xs:boolean"/>
+                <xs:attribute name="OSD" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:element name="GetServiceCapabilities">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetServiceCapabilitiesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Capabilities" type="trt:Capabilities"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
             <xs:element name="GetProfiles">
                 <xs:complexType/>
             </xs:element>
@@ -173,6 +212,12 @@
         </xs:schema>
     </wsdl:types>
 
+    <wsdl:message name="GetServiceCapabilitiesRequest">
+        <wsdl:part name="parameters" element="trt:GetServiceCapabilities"/>
+    </wsdl:message>
+    <wsdl:message name="GetServiceCapabilitiesResponse">
+        <wsdl:part name="parameters" element="trt:GetServiceCapabilitiesResponse"/>
+    </wsdl:message>
     <wsdl:message name="GetProfilesRequest">
         <wsdl:part name="parameters" element="trt:GetProfiles"/>
     </wsdl:message>
@@ -224,6 +269,10 @@
     <wsdl:message name="GetVideoEncoderConfigurationOptionsResponse"><wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurationOptionsResponse"/></wsdl:message>
 
     <wsdl:portType name="MediaPort">
+        <wsdl:operation name="GetServiceCapabilities">
+            <wsdl:input message="trt:GetServiceCapabilitiesRequest"/>
+            <wsdl:output message="trt:GetServiceCapabilitiesResponse"/>
+        </wsdl:operation>
         <wsdl:operation name="GetProfiles">
             <wsdl:input message="trt:GetProfilesRequest"/>
             <wsdl:output message="trt:GetProfilesResponse"/>
@@ -258,6 +307,11 @@
 
     <wsdl:binding name="MediaBinding" type="trt:MediaPort">
         <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+        <wsdl:operation name="GetServiceCapabilities">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetServiceCapabilities"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
         <wsdl:operation name="GetProfiles">
             <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetProfiles"/>
             <wsdl:input>
