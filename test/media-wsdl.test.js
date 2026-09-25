@@ -20,6 +20,7 @@ test("Media WSDL loads and exposes the read-only query operations", async () => 
     const client = await createClient(wsdlPath);
     const port = client.describe().MediaService.MediaPort;
 
+    assert.ok(port.GetServiceCapabilities);
     assert.ok(port.GetProfile);
     assert.ok(port.GetVideoSourceConfigurations);
     assert.ok(port.GetCompatibleVideoSourceConfigurations);
