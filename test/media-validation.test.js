@@ -38,6 +38,15 @@ function cameraFixture() {
     };
 }
 
+function validStreamSetup(protocol = "RTSP") {
+    return {
+        Stream: "RTP-Unicast",
+        Transport: {
+            Protocol: protocol
+        }
+    };
+}
+
 function assertFault(error, expectedSubcodes) {
     assert.ok(error && error.Fault, "expected a structured SOAP fault");
     assert.equal(error.Fault.Code.Value, "soap:Sender");
@@ -57,7 +66,7 @@ test("unknown ProfileToken returns NoProfile instead of falling back to HQ", asy
     const media = new MediaService(cameraFixture());
 
     await assert.rejects(
-        () => media.GetStreamUri({ ProfileToken: "not-a-real-profile" }),
+        () => media.GetStreamUri({ StreamSetup: validStreamSetup(), ProfileToken: "not-a-real-profile" }),
         (error) => assertFault(error, ["ter:InvalidArgVal", "ter:NoProfile"])
     );
 });
@@ -66,7 +75,7 @@ test("missing ProfileToken returns InvalidArgs", async () => {
     const media = new MediaService(cameraFixture());
 
     await assert.rejects(
-        () => media.GetStreamUri({}),
+        () => media.GetStreamUri({ StreamSetup: validStreamSetup() }),
         (error) => assertFault(error, ["ter:InvalidArgs"])
     );
 });
