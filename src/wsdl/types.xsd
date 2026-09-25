@@ -9,6 +9,27 @@
         <xs:restriction base="xs:string"/>
     </xs:simpleType>
 
+    <xs:simpleType name="ScopeDefinition">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Fixed"/>
+            <xs:enumeration value="Configurable"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="Scope">
+        <xs:sequence>
+            <xs:element name="ScopeDef" type="tt:ScopeDefinition"/>
+            <xs:element name="ScopeItem" type="xs:anyURI"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="DiscoveryMode">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Discoverable"/>
+            <xs:enumeration value="NonDiscoverable"/>
+        </xs:restriction>
+    </xs:simpleType>
+
     <xs:complexType name="Time">
         <xs:sequence>
             <xs:element name="Hour" type="xs:int"/>
