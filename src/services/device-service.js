@@ -1,4 +1,5 @@
 const logger = require("../log-manager");
+const { getFixedScopeObjects } = require("../onvif-scopes");
 
 class DeviceService {
     constructor(camera) {
@@ -43,6 +44,56 @@ class DeviceService {
             Extension: {
                 ProfileCapabilities: {
                     MaximumNumberOfProfiles: 2
+                }
+            }
+        };
+    }
+
+    buildDeviceServiceCapabilities() {
+        return {
+            Network: {
+                $attributes: {
+                    IPFilter: false,
+                    ZeroConfiguration: false,
+                    IPVersion6: false,
+                    DynDNS: false,
+                    Dot11Configuration: false,
+                    Dot1XConfigurations: 0,
+                    HostnameFromDHCP: false,
+                    NTP: 0,
+                    DHCPv6: false
+                }
+            },
+            Security: {
+                $attributes: {
+                    "TLS1.0": false,
+                    "TLS1.1": false,
+                    "TLS1.2": false,
+                    OnboardKeyGeneration: false,
+                    AccessPolicyConfig: false,
+                    DefaultAccessPolicy: false,
+                    Dot1X: false,
+                    RemoteUserHandling: false,
+                    "X.509Token": false,
+                    SAMLToken: false,
+                    KerberosToken: false,
+                    UsernameToken: true,
+                    HttpDigest: false,
+                    RELToken: false
+                }
+            },
+            System: {
+                $attributes: {
+                    DiscoveryResolve: false,
+                    DiscoveryBye: false,
+                    RemoteDiscovery: false,
+                    SystemBackup: false,
+                    SystemLogging: false,
+                    FirmwareUpgrade: false,
+                    HttpFirmwareUpgrade: false,
+                    HttpSystemBackup: false,
+                    HttpSystemLogging: false,
+                    HttpSupportInformation: false
                 }
             }
         };
@@ -104,6 +155,39 @@ class DeviceService {
                     }
                 }
             }
+        };
+    }
+
+    // ONVIF: GetScopes
+    async GetScopes() {
+        const scopes = getFixedScopeObjects(this.camera);
+
+        logger.debug("device",
+            `GetScopes called for ${this.camera.name} -> ${scopes.map((scope) => scope.ScopeItem).join(", ")}`
+        );
+
+        return {
+            Scopes: scopes
+        };
+    }
+
+    // ONVIF: GetDiscoveryMode
+    async GetDiscoveryMode() {
+        logger.debug("device", `GetDiscoveryMode called for ${this.camera.name} -> Discoverable`);
+
+        return {
+            DiscoveryMode: "Discoverable"
+        };
+    }
+
+    // ONVIF: GetServiceCapabilities
+    async GetServiceCapabilities() {
+        const capabilities = this.buildDeviceServiceCapabilities();
+
+        logger.debug("device", `GetServiceCapabilities called for ${this.camera.name}`);
+
+        return {
+            Capabilities: capabilities
         };
     }
 
@@ -191,6 +275,9 @@ class DeviceService {
         return {
             GetDeviceInformation: this.GetDeviceInformation.bind(this),
             GetSystemDateAndTime: this.GetSystemDateAndTime.bind(this),
+            GetScopes: this.GetScopes.bind(this),
+            GetDiscoveryMode: this.GetDiscoveryMode.bind(this),
+            GetServiceCapabilities: this.GetServiceCapabilities.bind(this),
             GetCapabilities: this.GetCapabilities.bind(this),
             GetServices: this.GetServices.bind(this)
         };
