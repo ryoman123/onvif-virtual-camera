@@ -208,6 +208,18 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="IntRange">
+        <xs:sequence>
+            <xs:element name="Min" type="xs:int"/>
+            <xs:element name="Max" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="VideoEncoderConfigurationOptions">
+        <xs:sequence>
+            <xs:element name="QualityRange" type="tt:IntRange"/>
+        </xs:sequence>
+    </xs:complexType>
     <xs:complexType name="Resolution">
         <xs:sequence>
             <xs:element name="Width" type="xs:int"/>
