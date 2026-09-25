@@ -1,5 +1,6 @@
 const logger = require("../log-manager");
 const faults = require("../onvif-fault");
+const { buildMediaServiceCapabilities } = require("../service-capabilities");
 
 class MediaService {
     constructor(camera) {
@@ -433,8 +434,20 @@ class MediaService {
             Options: this.buildVideoEncoderConfigurationOptions(profile)
         };
     }
+    // ONVIF: GetServiceCapabilities
+    async GetServiceCapabilities() {
+        const capabilities = buildMediaServiceCapabilities();
+
+        logger.debug("media", `GetServiceCapabilities called for ${this.camera.name}`);
+
+        return {
+            Capabilities: capabilities
+        };
+    }
+
     GetServiceDefinition() {
         return {
+            GetServiceCapabilities: this.GetServiceCapabilities.bind(this),
             GetProfiles: this.GetProfiles.bind(this),
             GetProfile: this.GetProfile.bind(this),
             GetStreamUri: this.GetStreamUri.bind(this),
