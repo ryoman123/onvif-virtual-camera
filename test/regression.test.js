@@ -166,6 +166,7 @@ test("WS-Discovery scopes preserve the current identity/location inputs", () => 
     const scopes = discovery.getDiscoveryScopes(camera);
 
     assert.match(scopes, /onvif:\/\/www\.onvif\.org\/type\/video_encoder/);
+    assert.match(scopes, /onvif:\/\/www\.onvif\.org\/Profile\/Streaming/);
     assert.match(scopes, /onvif:\/\/www\.onvif\.org\/name\/VirtualCam%20Test%20Virtual%20Camera/);
     assert.match(scopes, /onvif:\/\/www\.onvif\.org\/hardware\/Test%20Virtual%20Camera/);
     assert.match(scopes, /onvif:\/\/www\.onvif\.org\/location\/192\.0\.2\.57/);
