@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const dgram = require("dgram");
 const logger = require("./log-manager");
+const { getDiscoveryScopeUris } = require("./onvif-scopes");
 
 const MULTICAST_ADDRESS = "239.255.255.250";
 const DISCOVERY_PORT = 3702;
@@ -305,17 +306,7 @@ class DiscoveryManager {
     }
 
     getDiscoveryScopes(camera) {
-        const manufacturer = camera.identity?.manufacturer || "";
-        const model = camera.identity?.model || "";
-        const discoveryName = [manufacturer, model].filter(Boolean).join(" ") || camera.name;
-        const scopes = [
-            "onvif://www.onvif.org/type/video_encoder",
-            `onvif://www.onvif.org/name/${this.escapeScope(discoveryName)}`,
-            `onvif://www.onvif.org/hardware/${this.escapeScope(camera.identity.model)}`,
-            `onvif://www.onvif.org/location/${this.escapeScope((camera.host && camera.host.hostname) || "virtual")}`
-        ];
-
-        return scopes.join("\n          ");
+        return getDiscoveryScopeUris(camera).join("\n          ");
     }
 
     buildEndpointAddress(camera) {
@@ -376,11 +367,6 @@ class DiscoveryManager {
         const rand = Math.floor(Math.random() * 1e9).toString(16);
         const ts = Date.now().toString(16);
         return `${ts}-${rand}`;
-    }
-
-    escapeScope(value) {
-        if (!value) return "";
-        return encodeURIComponent(String(value));
     }
 
     extractMessageId(xml) {
