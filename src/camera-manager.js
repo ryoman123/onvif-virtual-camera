@@ -15,6 +15,7 @@ class CameraManager {
         this.server = null;
         this.monitorTimer = null;
         this.restarting = false;
+        this.stopping = false;
     }
 
     buildStartupSummary() {
@@ -138,7 +139,7 @@ class CameraManager {
     }
 
     async handleNetworkChange(network) {
-        if (this.restarting) {
+        if (this.restarting || this.stopping) {
             return;
         }
 
@@ -185,7 +186,7 @@ class CameraManager {
         const intervalMs = global.runtime?.ip_monitor_interval_ms || 15000;
 
         this.monitorTimer = setInterval(async () => {
-            if (!this.camera || this.restarting) {
+            if (!this.camera || this.restarting || this.stopping) {
                 return;
             }
 
@@ -217,7 +218,30 @@ class CameraManager {
         logger.info(`Started IP monitoring for ${this.cameraConfig.name} (interval=${intervalMs}ms)`);
     }
 
+    async stop() {
+        if (this.stopping) {
+            return;
+        }
+
+        this.stopping = true;
+
+        if (this.monitorTimer) {
+            clearInterval(this.monitorTimer);
+            this.monitorTimer = null;
+        }
+
+        const server = this.server;
+        this.server = null;
+
+        if (server) {
+            await server.stop();
+        }
+
+        logger.info(`Stopped virtual camera: ${this.cameraConfig.name}`);
+    }
+
     async start() {
+        this.stopping = false;
         logger.info(`Initializing virtual camera: ${this.cameraConfig.name}`);
 
         const camera = await this.resolveRuntimeWithDhcpRetry();
