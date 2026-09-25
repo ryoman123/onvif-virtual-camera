@@ -24,7 +24,8 @@
             <xs:element name="GetStreamUri">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="ProfileToken" type="tt:ReferenceToken" minOccurs="0"/>
+                        <xs:element name="StreamSetup" type="tt:StreamSetup"/>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
