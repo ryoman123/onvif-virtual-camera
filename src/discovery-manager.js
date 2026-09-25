@@ -495,12 +495,12 @@ class DiscoveryManager {
     }
 
     extractResolveAddress(xml) {
-        const resolveMatch = xml.match(/<(?:[A-Za-z_][\\w.-]*:)?Resolve\\b[^>]*>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?Resolve>/i);
+        const resolveMatch = xml.match(/<(?:[A-Za-z_][\w.-]*:)?Resolve\b[^>]*>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?Resolve>/i);
         if (!resolveMatch) {
             return null;
         }
 
-        const addressMatch = resolveMatch[1].match(/<(?:[A-Za-z_][\\w.-]*:)?Address\\b[^>]*>([^<]+)<\\/(?:[A-Za-z_][\\w.-]*:)?Address>/i);
+        const addressMatch = resolveMatch[1].match(/<(?:[A-Za-z_][\w.-]*:)?Address\b[^>]*>([^<]+)<\/(?:[A-Za-z_][\w.-]*:)?Address>/i);
         return addressMatch ? addressMatch[1].trim() : null;
     }
     extractMessageId(xml) {
