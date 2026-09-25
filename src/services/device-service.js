@@ -1,5 +1,11 @@
 const logger = require("../log-manager");
 const { getFixedScopeObjects } = require("../onvif-scopes");
+const {
+    buildDeviceServiceCapabilities,
+    buildMediaServiceCapabilities,
+    renderDeviceServiceCapabilitiesXml,
+    renderMediaServiceCapabilitiesXml
+} = require("../service-capabilities");
 
 class DeviceService {
     constructor(camera) {
@@ -52,53 +58,7 @@ class DeviceService {
     }
 
     buildDeviceServiceCapabilities() {
-        return {
-            Network: {
-                $attributes: {
-                    IPFilter: false,
-                    ZeroConfiguration: false,
-                    IPVersion6: false,
-                    DynDNS: false,
-                    Dot11Configuration: false,
-                    Dot1XConfigurations: 0,
-                    HostnameFromDHCP: false,
-                    NTP: 0,
-                    DHCPv6: false
-                }
-            },
-            Security: {
-                $attributes: {
-                    "TLS1.0": false,
-                    "TLS1.1": false,
-                    "TLS1.2": false,
-                    OnboardKeyGeneration: false,
-                    AccessPolicyConfig: false,
-                    DefaultAccessPolicy: false,
-                    Dot1X: false,
-                    RemoteUserHandling: false,
-                    "X.509Token": false,
-                    SAMLToken: false,
-                    KerberosToken: false,
-                    UsernameToken: true,
-                    HttpDigest: false,
-                    RELToken: false
-                }
-            },
-            System: {
-                $attributes: {
-                    DiscoveryResolve: true,
-                    DiscoveryBye: true,
-                    RemoteDiscovery: false,
-                    SystemBackup: false,
-                    SystemLogging: false,
-                    FirmwareUpgrade: false,
-                    HttpFirmwareUpgrade: false,
-                    HttpSystemBackup: false,
-                    HttpSystemLogging: false,
-                    HttpSupportInformation: false
-                }
-            }
-        };
+        return buildDeviceServiceCapabilities();
     }
 
     // ONVIF: GetDeviceInformation
@@ -124,37 +84,30 @@ class DeviceService {
     // ONVIF: GetSystemDateAndTime
     async GetSystemDateAndTime() {
         const now = new Date();
+        const utcDateTime = {
+            Time: {
+                Hour: now.getUTCHours(),
+                Minute: now.getUTCMinutes(),
+                Second: now.getUTCSeconds()
+            },
+            Date: {
+                Year: now.getUTCFullYear(),
+                Month: now.getUTCMonth() + 1,
+                Day: now.getUTCDate()
+            }
+        };
 
         return {
             SystemDateAndTime: {
-                DateTimeType: "NTP",
+                DateTimeType: "Manual",
                 DaylightSavings: false,
                 TimeZone: {
                     TZ: "UTC"
                 },
-                UTCDateTime: {
-                    Time: {
-                        Hour: now.getUTCHours(),
-                        Minute: now.getUTCMinutes(),
-                        Second: now.getUTCSeconds()
-                    },
-                    Date: {
-                        Year: now.getUTCFullYear(),
-                        Month: now.getUTCMonth() + 1,
-                        Day: now.getUTCDate()
-                    }
-                },
+                UTCDateTime: utcDateTime,
                 LocalDateTime: {
-                    Time: {
-                        Hour: now.getHours(),
-                        Minute: now.getMinutes(),
-                        Second: now.getSeconds()
-                    },
-                    Date: {
-                        Year: now.getFullYear(),
-                        Month: now.getMonth() + 1,
-                        Day: now.getDate()
-                    }
+                    Time: { ...utcDateTime.Time },
+                    Date: { ...utcDateTime.Date }
                 }
             }
         };
@@ -256,8 +209,15 @@ class DeviceService {
         ];
 
         if (includeCapability) {
-            services[0].Capabilities = this.buildDeviceCapabilities();
-            services[1].Capabilities = this.buildMediaCapabilities();
+            const deviceCapabilities = buildDeviceServiceCapabilities();
+            const mediaCapabilities = buildMediaServiceCapabilities();
+
+            services[0].Capabilities = {
+                $xml: renderDeviceServiceCapabilitiesXml(deviceCapabilities)
+            };
+            services[1].Capabilities = {
+                $xml: renderMediaServiceCapabilitiesXml(mediaCapabilities)
+            };
         }
 
         logger.debug('device',`GetServices called for ${this.camera.name} ` + `(IncludeCapability=${includeCapability})`);
