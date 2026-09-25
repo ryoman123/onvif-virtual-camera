@@ -38,7 +38,7 @@
             <xs:element name="GetSnapshotUri">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="ProfileToken" type="tt:ReferenceToken" minOccurs="0"/>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
@@ -62,7 +62,7 @@
             <xs:element name="GetVideoSourceConfiguration">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="ConfigurationToken" type="tt:ReferenceToken" minOccurs="0"/>
+                        <xs:element name="ConfigurationToken" type="tt:ReferenceToken"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
@@ -76,7 +76,7 @@
             <xs:element name="GetVideoEncoderConfiguration">
                 <xs:complexType>
                     <xs:sequence>
-                        <xs:element name="ConfigurationToken" type="tt:ReferenceToken" minOccurs="0"/>
+                        <xs:element name="ConfigurationToken" type="tt:ReferenceToken"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
@@ -84,6 +84,88 @@
                 <xs:complexType>
                     <xs:sequence>
                         <xs:element name="VideoEncoderConfiguration" type="tt:VideoEncoderConfiguration"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetProfile">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetProfileResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Profile" type="tt:Profile"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetVideoSourceConfigurations">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetVideoSourceConfigurationsResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Configurations" type="tt:VideoSourceConfiguration" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetCompatibleVideoSourceConfigurations">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetCompatibleVideoSourceConfigurationsResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Configurations" type="tt:VideoSourceConfiguration" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetVideoEncoderConfigurations">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetVideoEncoderConfigurationsResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Configurations" type="tt:VideoEncoderConfiguration" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetCompatibleVideoEncoderConfigurations">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetCompatibleVideoEncoderConfigurationsResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Configurations" type="tt:VideoEncoderConfiguration" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetVideoEncoderConfigurationOptions">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="ConfigurationToken" type="tt:ReferenceToken" minOccurs="0"/>
+                        <xs:element name="ProfileToken" type="tt:ReferenceToken" minOccurs="0"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetVideoEncoderConfigurationOptionsResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Options" type="tt:VideoEncoderConfigurationOptions"/>
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
@@ -127,6 +209,19 @@
         <wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurationResponse"/>
     </wsdl:message>
 
+    <wsdl:message name="GetProfileRequest"><wsdl:part name="parameters" element="trt:GetProfile"/></wsdl:message>
+    <wsdl:message name="GetProfileResponse"><wsdl:part name="parameters" element="trt:GetProfileResponse"/></wsdl:message>
+    <wsdl:message name="GetVideoSourceConfigurationsRequest"><wsdl:part name="parameters" element="trt:GetVideoSourceConfigurations"/></wsdl:message>
+    <wsdl:message name="GetVideoSourceConfigurationsResponse"><wsdl:part name="parameters" element="trt:GetVideoSourceConfigurationsResponse"/></wsdl:message>
+    <wsdl:message name="GetCompatibleVideoSourceConfigurationsRequest"><wsdl:part name="parameters" element="trt:GetCompatibleVideoSourceConfigurations"/></wsdl:message>
+    <wsdl:message name="GetCompatibleVideoSourceConfigurationsResponse"><wsdl:part name="parameters" element="trt:GetCompatibleVideoSourceConfigurationsResponse"/></wsdl:message>
+    <wsdl:message name="GetVideoEncoderConfigurationsRequest"><wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurations"/></wsdl:message>
+    <wsdl:message name="GetVideoEncoderConfigurationsResponse"><wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurationsResponse"/></wsdl:message>
+    <wsdl:message name="GetCompatibleVideoEncoderConfigurationsRequest"><wsdl:part name="parameters" element="trt:GetCompatibleVideoEncoderConfigurations"/></wsdl:message>
+    <wsdl:message name="GetCompatibleVideoEncoderConfigurationsResponse"><wsdl:part name="parameters" element="trt:GetCompatibleVideoEncoderConfigurationsResponse"/></wsdl:message>
+    <wsdl:message name="GetVideoEncoderConfigurationOptionsRequest"><wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurationOptions"/></wsdl:message>
+    <wsdl:message name="GetVideoEncoderConfigurationOptionsResponse"><wsdl:part name="parameters" element="trt:GetVideoEncoderConfigurationOptionsResponse"/></wsdl:message>
+
     <wsdl:portType name="MediaPort">
         <wsdl:operation name="GetProfiles">
             <wsdl:input message="trt:GetProfilesRequest"/>
@@ -152,6 +247,12 @@
             <wsdl:input message="trt:GetVideoEncoderConfigurationRequest"/>
             <wsdl:output message="trt:GetVideoEncoderConfigurationResponse"/>
         </wsdl:operation>
+        <wsdl:operation name="GetProfile"><wsdl:input message="trt:GetProfileRequest"/><wsdl:output message="trt:GetProfileResponse"/></wsdl:operation>
+        <wsdl:operation name="GetVideoSourceConfigurations"><wsdl:input message="trt:GetVideoSourceConfigurationsRequest"/><wsdl:output message="trt:GetVideoSourceConfigurationsResponse"/></wsdl:operation>
+        <wsdl:operation name="GetCompatibleVideoSourceConfigurations"><wsdl:input message="trt:GetCompatibleVideoSourceConfigurationsRequest"/><wsdl:output message="trt:GetCompatibleVideoSourceConfigurationsResponse"/></wsdl:operation>
+        <wsdl:operation name="GetVideoEncoderConfigurations"><wsdl:input message="trt:GetVideoEncoderConfigurationsRequest"/><wsdl:output message="trt:GetVideoEncoderConfigurationsResponse"/></wsdl:operation>
+        <wsdl:operation name="GetCompatibleVideoEncoderConfigurations"><wsdl:input message="trt:GetCompatibleVideoEncoderConfigurationsRequest"/><wsdl:output message="trt:GetCompatibleVideoEncoderConfigurationsResponse"/></wsdl:operation>
+        <wsdl:operation name="GetVideoEncoderConfigurationOptions"><wsdl:input message="trt:GetVideoEncoderConfigurationOptionsRequest"/><wsdl:output message="trt:GetVideoEncoderConfigurationOptionsResponse"/></wsdl:operation>
     </wsdl:portType>
 
     <wsdl:binding name="MediaBinding" type="trt:MediaPort">
@@ -209,6 +310,36 @@
             <wsdl:output>
                 <soap:body use="literal"/>
             </wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetProfile">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetProfile"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetVideoSourceConfigurations">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetVideoSourceConfigurations"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetCompatibleVideoSourceConfigurations">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetCompatibleVideoSourceConfigurations"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetVideoEncoderConfigurations">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetVideoEncoderConfigurations"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetCompatibleVideoEncoderConfigurations">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetCompatibleVideoEncoderConfigurations"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetVideoEncoderConfigurationOptions">
+            <soap:operation soapAction="http://www.onvif.org/ver10/media/wsdl/GetVideoEncoderConfigurationOptions"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
         </wsdl:operation>
     </wsdl:binding>
 
