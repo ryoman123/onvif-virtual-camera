@@ -1,4 +1,5 @@
 const logger = require("../log-manager");
+const faults = require("../onvif-fault");
 
 class MediaService {
     constructor(camera) {
@@ -30,8 +31,16 @@ class MediaService {
         return normalized || "camera";
     }
 
-    getProfileDefinitionByToken(token) {
-        if (token === this.profileTokenLq) {
+    requireToken(token) {
+        if (token === undefined || token === null || token === "") {
+            throw faults.invalidArgs();
+        }
+
+        return token;
+    }
+
+    getProfileDefinition(kind) {
+        if (kind === "lq") {
             return {
                 kind: "lq",
                 profileToken: this.profileTokenLq,
@@ -58,12 +67,46 @@ class MediaService {
         };
     }
 
-    getProfileDefinitionByConfigurationToken(token) {
-        if (token === this.videoSourceConfigTokenLq || token === this.videoEncoderTokenLq) {
-            return this.getProfileDefinitionByToken(this.profileTokenLq);
+    getProfileDefinitionByToken(token) {
+        this.requireToken(token);
+
+        if (token === this.profileTokenHq) {
+            return this.getProfileDefinition("hq");
         }
 
-        return this.getProfileDefinitionByToken(this.profileTokenHq);
+        if (token === this.profileTokenLq) {
+            return this.getProfileDefinition("lq");
+        }
+
+        throw faults.noProfile();
+    }
+
+    getProfileDefinitionByVideoSourceConfigurationToken(token) {
+        this.requireToken(token);
+
+        if (token === this.videoSourceConfigTokenHq) {
+            return this.getProfileDefinition("hq");
+        }
+
+        if (token === this.videoSourceConfigTokenLq) {
+            return this.getProfileDefinition("lq");
+        }
+
+        throw faults.noConfig();
+    }
+
+    getProfileDefinitionByVideoEncoderConfigurationToken(token) {
+        this.requireToken(token);
+
+        if (token === this.videoEncoderTokenHq) {
+            return this.getProfileDefinition("hq");
+        }
+
+        if (token === this.videoEncoderTokenLq) {
+            return this.getProfileDefinition("lq");
+        }
+
+        throw faults.noConfig();
     }
 
     buildProfile(profile) {
@@ -137,9 +180,11 @@ class MediaService {
 
     // ONVIF: GetSnapshotUri
     async GetSnapshotUri(args) {
-        logger.debug('media',
+        const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
+
+        logger.debug("media",
             `GetSnapshotUri called for ${this.camera.name} ` +
-            `(ProfileToken=${args && args.ProfileToken}) -> ${this.camera.endpoints.snapshotUri}`
+            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind}) -> ${this.camera.endpoints.snapshotUri}`
         );
 
         return {
@@ -180,9 +225,11 @@ class MediaService {
 
     // ONVIF: GetVideoSourceConfiguration
     async GetVideoSourceConfiguration(args) {
-        const profile = this.getProfileDefinitionByConfigurationToken(args && args.ConfigurationToken);
+        const profile = this.getProfileDefinitionByVideoSourceConfigurationToken(
+            args && args.ConfigurationToken
+        );
 
-        logger.debug('media',
+        logger.debug("media",
             `GetVideoSourceConfiguration called for ${this.camera.name} ` +
             `(ConfigurationToken=${args && args.ConfigurationToken}, kind=${profile.kind})`
         );
@@ -201,9 +248,11 @@ class MediaService {
 
     // ONVIF: GetVideoEncoderConfiguration
     async GetVideoEncoderConfiguration(args) {
-        const profile = this.getProfileDefinitionByConfigurationToken(args && args.ConfigurationToken);
+        const profile = this.getProfileDefinitionByVideoEncoderConfigurationToken(
+            args && args.ConfigurationToken
+        );
 
-        logger.debug('media',
+        logger.debug("media",
             `GetVideoEncoderConfiguration called for ${this.camera.name} ` +
             `(ConfigurationToken=${args && args.ConfigurationToken}, kind=${profile.kind})`
         );

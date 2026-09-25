@@ -10,7 +10,8 @@
     "Daniela Hasenbring <daniela@koshigaya.de>"
   ],
   "scripts": {
-    "start": "node main.js"
+    "start": "node main.js",
+    "test": "node --test"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
