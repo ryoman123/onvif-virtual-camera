@@ -8,6 +8,7 @@ const DeviceService = require("./services/device-service");
 const MediaService = require("./services/media-service");
 const RtspProxyService = require("./services/rtsp-proxy-service");
 const SnapshotService = require("./services/snapshot-service");
+const { UsernameTokenAuthenticator } = require("./ws-security");
 
 class OnvifServer {
     constructor(camera, discoveryManager) {
@@ -15,6 +16,23 @@ class OnvifServer {
         this.hasAuth = !!(this.camera.auth && this.camera.auth.username && this.camera.auth.password);
         this.lastSoapMethod = "unknown";
         this.httpServer = null;
+        this.authAuditWarnings = new Map();
+
+        const wsSecurity = (global.runtime && global.runtime.ws_security) || {};
+        this.wsSecurityPolicy = {
+            mode: wsSecurity.mode || "audit",
+            maxAgeSeconds: wsSecurity.max_age_seconds ?? 300,
+            futureSkewSeconds: wsSecurity.future_skew_seconds ?? 300,
+            nonceCacheSize: wsSecurity.nonce_cache_size ?? 2048,
+            allowPasswordText: wsSecurity.allow_password_text !== false
+        };
+        this.usernameTokenAuthenticator = this.hasAuth
+            ? new UsernameTokenAuthenticator({
+                username: this.camera.auth.username,
+                password: this.camera.auth.password,
+                ...this.wsSecurityPolicy
+            })
+            : null;
 
         this.discoveryManager = discoveryManager;
         this.deviceService = new DeviceService(camera);
@@ -59,105 +77,65 @@ class OnvifServer {
         return merged;
     }
 
+    logAuthAuditWarning(issue, credentialMode) {
+        const now = Date.now();
+        const lastLogged = this.authAuditWarnings.get(issue) || 0;
+
+        if (now - lastLogged < 300000) {
+            return;
+        }
+
+        this.authAuditWarnings.set(issue, now);
+        logger.warn(
+            `SOAP auth policy audit for ${this.camera.name}: issue=${issue}, ` +
+            `credentialMode=${credentialMode || "<unknown>"}, policy=${this.wsSecurityPolicy.mode}`
+        );
+    }
+
     authenticateRequest(security) {
         if (!this.hasAuth) {
-            logger.debug('auth', `SOAP auth disabled for ${this.camera.name}`);
+            logger.debug("auth", `SOAP auth disabled for ${this.camera.name}`);
             return true;
         }
-        if (!security) {
-            logger.warn(`SOAP auth missing security object for ${this.camera.name} (method=${this.lastSoapMethod})`);
+
+        const result = this.usernameTokenAuthenticator.authenticate(security);
+
+        if (result.accepted && this.wsSecurityPolicy.mode === "audit") {
+            for (const warning of result.warnings) {
+                this.logAuthAuditWarning(warning, result.credentialMode);
+            }
+        }
+
+        if (!result.accepted) {
+            if (result.reason === "missing-security") {
+                logger.warn(`SOAP auth missing security object for ${this.camera.name} (method=${this.lastSoapMethod})`);
+            } else if (result.reason === "missing-username-token") {
+                logger.warn(`SOAP auth missing UsernameToken for ${this.camera.name}`);
+            } else if (["digest-missing-required-fields", "invalid-nonce"].includes(result.reason)) {
+                logger.warn(`SOAP auth rejected for ${this.camera.name}: reason=${result.reason}`);
+            } else if (this.wsSecurityPolicy.mode === "enforce" && result.warnings.length > 0) {
+                logger.warn(
+                    `SOAP auth policy rejected for ${this.camera.name}: reason=${result.reason}, ` +
+                    `credentialMode=${result.credentialMode || "<unknown>"}`
+                );
+            } else {
+                logger.debug(
+                    "auth",
+                    `SOAP auth rejected for ${this.camera.name}: reason=${result.reason}, ` +
+                    `credentialMode=${result.credentialMode || "<unknown>"}`
+                );
+            }
+
             return false;
         }
 
-        logger.debug('auth', `SOAP auth security keys for ${this.camera.name}: ${Object.keys(security).join(", ")}`);
-
-        const token = security.UsernameToken;
-        if (!token) {
-            logger.warn(`SOAP auth missing UsernameToken for ${this.camera.name}`);
-            return false;
-        }
-
-        logger.debug('auth', `SOAP UsernameToken keys for ${this.camera.name}: ${Object.keys(token).join(", ")}`);
-
-        const username = token.Username;
-        const passwordRaw = token.Password;
-        const nonceRaw = token.Nonce;
-        const createdRaw = token.Created;
-
-        const passwordValue = typeof passwordRaw === "string"
-            ? passwordRaw
-            : passwordRaw?.$value ?? passwordRaw?._ ?? passwordRaw?.value;
-
-        const nonceValue = typeof nonceRaw === "string"
-            ? nonceRaw
-            : nonceRaw?.$value ?? nonceRaw?._ ?? nonceRaw?.value;
-
-        const createdValue = typeof createdRaw === "string"
-            ? createdRaw
-            : createdRaw?.$value ?? createdRaw?._ ?? createdRaw?.value;
-
-        logger.debug('auth', 
-            `SOAP auth attempt for ${this.camera.name}: ` +
-            `username=${username || "<missing>"}, ` +
-            `hasPassword=${passwordRaw !== undefined}, ` +
-            `passwordType=${typeof passwordRaw}, ` +
-            `hasNonce=${nonceRaw !== undefined}, ` +
-            `hasCreated=${createdRaw !== undefined}`
+        logger.debug(
+            "auth",
+            `SOAP auth accepted for ${this.camera.name}: ` +
+            `credentialMode=${result.credentialMode || "<unknown>"}, auditWarnings=${result.warnings.length}`
         );
 
-        if (passwordRaw && typeof passwordRaw === "object") {
-            logger.debug('auth', `SOAP Password object keys for ${this.camera.name}: ${Object.keys(passwordRaw).join(", ")}`);
-        }
-
-        if (username !== this.camera.auth.username) {
-            logger.debug('auth', `SOAP auth attempt for ${this.camera.name}: username=${username}, accepted=false (username mismatch)`);
-            return false;
-        }
-
-        if (typeof passwordRaw === "string") {
-            const accepted = passwordRaw === this.camera.auth.password;
-            logger.debug('auth', `SOAP auth attempt for ${this.camera.name}: username=${username}, accepted=${accepted}, mode=PasswordText`);
-            return accepted;
-        }
-
-        if (passwordRaw && typeof passwordRaw === "object") {
-            const crypto = require("crypto");
-            const passwordTypeUri = passwordRaw?.$attributes?.Type || passwordRaw?.Type || passwordRaw?.type || "";
-
-            if (!passwordValue || !nonceValue || !createdValue) {
-                logger.warn(`SOAP auth digest missing required fields for ${this.camera.name}`);
-                return false;
-            }
-
-            let nonceBuffer;
-            try {
-                nonceBuffer = Buffer.from(nonceValue, "base64");
-            } catch (err) {
-                logger.warn(`SOAP auth digest nonce decode failed for ${this.camera.name}: ${err.message}`);
-                return false;
-            }
-
-            const expectedDigest = crypto
-                .createHash("sha1")
-                .update(Buffer.concat([
-                    nonceBuffer,
-                    Buffer.from(createdValue, "utf8"),
-                    Buffer.from(this.camera.auth.password, "utf8")
-                ]))
-                .digest("base64");
-
-            const accepted = passwordValue === expectedDigest;
-
-            logger.debug('auth', 
-                `SOAP auth attempt for ${this.camera.name}: ` +
-                `username=${username}, accepted=${accepted}, mode=PasswordDigest, type=${passwordTypeUri || "<unknown>"}`
-            );
-
-            return accepted;
-        }
-
-        logger.warn(`SOAP auth unsupported password format for ${this.camera.name}`);
-        return false;
+        return true;
     }
 
     async stop() {
