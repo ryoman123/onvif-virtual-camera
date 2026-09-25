@@ -1,7 +1,9 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const MediaService = require("../src/services/media-service");\n\nglobal.runtime = { enable_debug_logs: false };
+const MediaService = require("../src/services/media-service");
+
+global.runtime = { enable_debug_logs: false };
 
 function cameraFixture() {
     return {
