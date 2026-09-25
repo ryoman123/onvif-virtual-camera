@@ -68,3 +68,14 @@ test("legacy GetCapabilities advertises implemented discovery capabilities", asy
     assert.equal(response.Capabilities.Device.System.DiscoveryResolve, true);
     assert.equal(response.Capabilities.Device.System.DiscoveryBye, true);
 });
+
+
+test("GetSystemDateAndTime reports a self-consistent UTC manual clock", async () => {
+    const device = new DeviceService(cameraFixture());
+    const response = await device.GetSystemDateAndTime();
+    const value = response.SystemDateAndTime;
+
+    assert.equal(value.DateTimeType, "Manual");
+    assert.equal(value.TimeZone.TZ, "UTC");
+    assert.deepEqual(value.LocalDateTime, value.UTCDateTime);
+});
