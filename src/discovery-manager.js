@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const dgram = require("dgram");
 const logger = require("./log-manager");
 const { getDiscoveryScopeUris } = require("./onvif-scopes");
+const { parseProbeConstraints, matchesProbe } = require("./discovery-matcher");
 
 const MULTICAST_ADDRESS = "239.255.255.250";
 const DISCOVERY_PORT = 3702;
@@ -260,13 +261,24 @@ class DiscoveryManager {
 
         logger.debug("discovery", `WS-Discovery Probe received from ${rinfo.address}:${rinfo.port} ` + `(activeCameras=${activeEntries.length}, messageId=${relatesTo || "<missing>"})`);
 
-        const probeTypes = this.extractProbeTypes(xml);
-        if (probeTypes) {
-            logger.debug("discovery", `WS-Discovery Probe Types: ${probeTypes}`);
+        const constraints = parseProbeConstraints(xml);
+        if (!constraints) {
+            logger.debug("discovery", `Ignoring malformed WS-Discovery Probe from ${rinfo.address}:${rinfo.port}`);
+            return;
         }
 
-        for (const entry of activeEntries) {
-            const replyDelayMs = this.getReplyDelayMs(activeEntries.length);
+        const matchingEntries = activeEntries.filter((entry) =>
+            matchesProbe(entry.camera, constraints, getDiscoveryScopeUris)
+        );
+
+        logger.debug("discovery",
+            `WS-Discovery Probe constraints from ${rinfo.address}:${rinfo.port}: ` +
+            `types=${constraints.types.length}, scopes=${constraints.scopes.length}, ` +
+            `matchBy=${constraints.matchBy}, matches=${matchingEntries.length}`
+        );
+
+        for (const entry of matchingEntries) {
+            const replyDelayMs = this.getReplyDelayMs(matchingEntries.length);
             logger.debug("discovery",
                 `Scheduling ProbeMatches for ${entry.camera.name} to ${rinfo.address}:${rinfo.port} ` +
                 `(delay=${replyDelayMs}ms, endpoint=${entry.endpointAddress}, xaddr=${entry.xaddr}, mac=${entry.camera.mac}, ip=${entry.camera.ip})`
@@ -628,10 +640,6 @@ class DiscoveryManager {
         return match ? match[1].trim() : null;
     }
 
-    extractProbeTypes(xml) {
-        const match = xml.match(/<[^:>]*:?Types[^>]*>([^<]+)<\/[^:>]*:?Types>/i);
-        return match ? match[1].trim() : null;
-    }
 }
 
 module.exports = DiscoveryManager;
