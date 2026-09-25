@@ -56,14 +56,15 @@ test("GetServiceCapabilities conservatively reports implemented Device features"
     assert.equal(response.Capabilities.Security.$attributes.UsernameToken, true);
     assert.equal(response.Capabilities.Security.$attributes["TLS1.2"], false);
     assert.equal(response.Capabilities.System.$attributes.DiscoveryResolve, true);
-    assert.equal(response.Capabilities.System.$attributes.DiscoveryBye, false);
+    assert.equal(response.Capabilities.System.$attributes.DiscoveryBye, true);
     assert.equal(response.Capabilities.Network.$attributes.IPVersion6, false);
 });
 
 
-test("legacy GetCapabilities also advertises DiscoveryResolve", async () => {
+test("legacy GetCapabilities advertises implemented discovery capabilities", async () => {
     const device = new DeviceService(cameraFixture());
     const response = await device.GetCapabilities({ Category: "Device" });
 
     assert.equal(response.Capabilities.Device.System.DiscoveryResolve, true);
+    assert.equal(response.Capabilities.Device.System.DiscoveryBye, true);
 });
