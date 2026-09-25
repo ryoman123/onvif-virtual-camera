@@ -32,3 +32,6 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Build production Docker image
+        run: docker build --target prod -t onvif-virtual-camera:test .
