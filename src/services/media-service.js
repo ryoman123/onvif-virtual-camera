@@ -39,6 +39,28 @@ class MediaService {
         return token;
     }
 
+    validateStreamSetup(streamSetup) {
+        if (!streamSetup) {
+            throw faults.invalidArgs();
+        }
+
+        const streamType = streamSetup.Stream;
+        const protocol = streamSetup.Transport && streamSetup.Transport.Protocol;
+
+        if (!streamType || !protocol) {
+            throw faults.invalidStreamSetup();
+        }
+
+        if (streamType !== "RTP-Unicast" || !["RTSP", "TCP"].includes(protocol)) {
+            throw faults.invalidStreamSetup();
+        }
+
+        return {
+            streamType,
+            protocol
+        };
+    }
+
     getProfileDefinition(kind) {
         if (kind === "lq") {
             return {
@@ -201,11 +223,13 @@ class MediaService {
     }
     // ONVIF: GetStreamUri
     async GetStreamUri(args) {
+        const setup = this.validateStreamSetup(args && args.StreamSetup);
         const profile = this.getProfileDefinitionByToken(args && args.ProfileToken);
 
         logger.debug("media",
             `GetStreamUri called for ${this.camera.name} ` +
-            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind}) -> ${profile.streamUri}`
+            `(ProfileToken=${args && args.ProfileToken}, kind=${profile.kind}, ` +
+            `Stream=${setup.streamType}, Protocol=${setup.protocol}) -> ${profile.streamUri}`
         );
 
         return {
