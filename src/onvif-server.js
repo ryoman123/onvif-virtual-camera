@@ -9,6 +9,7 @@ const MediaService = require("./services/media-service");
 const RtspProxyService = require("./services/rtsp-proxy-service");
 const SnapshotService = require("./services/snapshot-service");
 const { UsernameTokenAuthenticator } = require("./ws-security");
+const { inlineTypesXsd } = require("./wsdl-loader");
 
 class OnvifServer {
     constructor(camera, discoveryManager) {
@@ -54,27 +55,6 @@ class OnvifServer {
             `http=${lifecycle.httpReady}, snapshot=${lifecycle.snapshotReady}, ` +
             `rtsp=${lifecycle.rtspProxyReady}, discovery=${lifecycle.discoveryReady}`
         );
-    }
-
-    mergeTypesXsd(wsdlXml, xsdXml) {
-        const schemaBody = xsdXml
-            .replace(/^\s*<\?xml[^>]*>\s*/i, "")
-            .match(/<xs:schema\b[^>]*>([\s\S]*?)<\/xs:schema>/i)?.[1];
-
-        if (!schemaBody) {
-            throw new Error("types.xsd content does not contain a valid <xs:schema> block");
-        }
-
-        const merged = wsdlXml.replace(
-            /<xs:import\b[^>]*schemaLocation=["']types\.xsd["'][^>]*\/>\s*/i,
-            schemaBody
-        );
-
-        if (merged === wsdlXml) {
-            throw new Error("types.xsd import not found in WSDL");
-        }
-
-        return merged;
     }
 
     logAuthAuditWarning(issue, credentialMode) {
@@ -203,8 +183,8 @@ class OnvifServer {
             const deviceWsdlPath = path.join(wsdlFolder, 'device_service.wsdl');
             const mediaWsdlPath = path.join(wsdlFolder, 'media_service.wsdl');
             const typesXsdXml = fs.readFileSync(typesXsdPath, 'utf8');
-            const deviceWsdlXml = this.mergeTypesXsd(fs.readFileSync(deviceWsdlPath, 'utf8'), typesXsdXml);
-            const mediaWsdlXml = this.mergeTypesXsd(fs.readFileSync(mediaWsdlPath, 'utf8'), typesXsdXml);
+            const deviceWsdlXml = inlineTypesXsd(fs.readFileSync(deviceWsdlPath, 'utf8'), typesXsdXml);
+            const mediaWsdlXml = inlineTypesXsd(fs.readFileSync(mediaWsdlPath, 'utf8'), typesXsdXml);
 
             const deviceServiceDef = {
                 DeviceService: {
