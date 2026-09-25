@@ -63,6 +63,92 @@
                     </xs:sequence>
                 </xs:complexType>
             </xs:element>
+
+            <xs:complexType name="DeviceServiceNetworkCapabilities">
+                <xs:attribute name="IPFilter" type="xs:boolean"/>
+                <xs:attribute name="ZeroConfiguration" type="xs:boolean"/>
+                <xs:attribute name="IPVersion6" type="xs:boolean"/>
+                <xs:attribute name="DynDNS" type="xs:boolean"/>
+                <xs:attribute name="Dot11Configuration" type="xs:boolean"/>
+                <xs:attribute name="Dot1XConfigurations" type="xs:int"/>
+                <xs:attribute name="HostnameFromDHCP" type="xs:boolean"/>
+                <xs:attribute name="NTP" type="xs:int"/>
+                <xs:attribute name="DHCPv6" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:complexType name="DeviceServiceSecurityCapabilities">
+                <xs:attribute name="TLS1.0" type="xs:boolean"/>
+                <xs:attribute name="TLS1.1" type="xs:boolean"/>
+                <xs:attribute name="TLS1.2" type="xs:boolean"/>
+                <xs:attribute name="OnboardKeyGeneration" type="xs:boolean"/>
+                <xs:attribute name="AccessPolicyConfig" type="xs:boolean"/>
+                <xs:attribute name="DefaultAccessPolicy" type="xs:boolean"/>
+                <xs:attribute name="Dot1X" type="xs:boolean"/>
+                <xs:attribute name="RemoteUserHandling" type="xs:boolean"/>
+                <xs:attribute name="X.509Token" type="xs:boolean"/>
+                <xs:attribute name="SAMLToken" type="xs:boolean"/>
+                <xs:attribute name="KerberosToken" type="xs:boolean"/>
+                <xs:attribute name="UsernameToken" type="xs:boolean"/>
+                <xs:attribute name="HttpDigest" type="xs:boolean"/>
+                <xs:attribute name="RELToken" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:complexType name="DeviceServiceSystemCapabilities">
+                <xs:attribute name="DiscoveryResolve" type="xs:boolean"/>
+                <xs:attribute name="DiscoveryBye" type="xs:boolean"/>
+                <xs:attribute name="RemoteDiscovery" type="xs:boolean"/>
+                <xs:attribute name="SystemBackup" type="xs:boolean"/>
+                <xs:attribute name="SystemLogging" type="xs:boolean"/>
+                <xs:attribute name="FirmwareUpgrade" type="xs:boolean"/>
+                <xs:attribute name="HttpFirmwareUpgrade" type="xs:boolean"/>
+                <xs:attribute name="HttpSystemBackup" type="xs:boolean"/>
+                <xs:attribute name="HttpSystemLogging" type="xs:boolean"/>
+                <xs:attribute name="HttpSupportInformation" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:complexType name="DeviceServiceCapabilities">
+                <xs:sequence>
+                    <xs:element name="Network" type="tds:DeviceServiceNetworkCapabilities"/>
+                    <xs:element name="Security" type="tds:DeviceServiceSecurityCapabilities"/>
+                    <xs:element name="System" type="tds:DeviceServiceSystemCapabilities"/>
+                </xs:sequence>
+            </xs:complexType>
+
+            <xs:element name="GetScopes">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetScopesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Scopes" type="tt:Scope" minOccurs="1" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetDiscoveryMode">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetDiscoveryModeResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="DiscoveryMode" type="tt:DiscoveryMode"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetServiceCapabilities">
+                <xs:complexType/>
+            </xs:element>
+            <xs:element name="GetServiceCapabilitiesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Capabilities" type="tds:DeviceServiceCapabilities"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
         </xs:schema>
     </wsdl:types>
 
@@ -91,6 +177,26 @@
         <wsdl:part name="parameters" element="tds:GetServicesResponse"/>
     </wsdl:message>
 
+
+    <wsdl:message name="GetScopesRequest">
+        <wsdl:part name="parameters" element="tds:GetScopes"/>
+    </wsdl:message>
+    <wsdl:message name="GetScopesResponse">
+        <wsdl:part name="parameters" element="tds:GetScopesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="GetDiscoveryModeRequest">
+        <wsdl:part name="parameters" element="tds:GetDiscoveryMode"/>
+    </wsdl:message>
+    <wsdl:message name="GetDiscoveryModeResponse">
+        <wsdl:part name="parameters" element="tds:GetDiscoveryModeResponse"/>
+    </wsdl:message>
+    <wsdl:message name="GetServiceCapabilitiesRequest">
+        <wsdl:part name="parameters" element="tds:GetServiceCapabilities"/>
+    </wsdl:message>
+    <wsdl:message name="GetServiceCapabilitiesResponse">
+        <wsdl:part name="parameters" element="tds:GetServiceCapabilitiesResponse"/>
+    </wsdl:message>
+
     <wsdl:portType name="DevicePort">
         <wsdl:operation name="GetDeviceInformation">
             <wsdl:input message="tds:GetDeviceInformationRequest"/>
@@ -107,6 +213,19 @@
         <wsdl:operation name="GetServices">
             <wsdl:input message="tds:GetServicesRequest"/>
             <wsdl:output message="tds:GetServicesResponse"/>
+        </wsdl:operation>
+
+        <wsdl:operation name="GetScopes">
+            <wsdl:input message="tds:GetScopesRequest"/>
+            <wsdl:output message="tds:GetScopesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="GetDiscoveryMode">
+            <wsdl:input message="tds:GetDiscoveryModeRequest"/>
+            <wsdl:output message="tds:GetDiscoveryModeResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="GetServiceCapabilities">
+            <wsdl:input message="tds:GetServiceCapabilitiesRequest"/>
+            <wsdl:output message="tds:GetServiceCapabilitiesResponse"/>
         </wsdl:operation>
     </wsdl:portType>
 
@@ -147,6 +266,22 @@
             <wsdl:output>
                 <soap:body use="literal"/>
             </wsdl:output>
+        </wsdl:operation>
+
+        <wsdl:operation name="GetScopes">
+            <soap:operation soapAction="http://www.onvif.org/ver10/device/wsdl/GetScopes"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetDiscoveryMode">
+            <soap:operation soapAction="http://www.onvif.org/ver10/device/wsdl/GetDiscoveryMode"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetServiceCapabilities">
+            <soap:operation soapAction="http://www.onvif.org/ver10/device/wsdl/GetServiceCapabilities"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
         </wsdl:operation>
     </wsdl:binding>
     <wsdl:service name="DeviceService">
