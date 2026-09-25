@@ -10,6 +10,7 @@ class DeviceService {
         return {
             XAddr: this.camera.endpoints.deviceServiceUrl,
             System: {
+                DiscoveryResolve: true,
                 SupportedVersions: {
                     Major: 2,
                     Minor: 5
@@ -84,7 +85,7 @@ class DeviceService {
             },
             System: {
                 $attributes: {
-                    DiscoveryResolve: false,
+                    DiscoveryResolve: true,
                     DiscoveryBye: false,
                     RemoteDiscovery: false,
                     SystemBackup: false,
