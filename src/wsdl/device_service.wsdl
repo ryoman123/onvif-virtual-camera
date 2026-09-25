@@ -64,7 +64,7 @@
                 </xs:complexType>
             </xs:element>
 
-            <xs:complexType name="DeviceServiceNetworkCapabilities">
+            <xs:complexType name="NetworkCapabilities">
                 <xs:attribute name="IPFilter" type="xs:boolean"/>
                 <xs:attribute name="ZeroConfiguration" type="xs:boolean"/>
                 <xs:attribute name="IPVersion6" type="xs:boolean"/>
@@ -77,7 +77,7 @@
                 <xs:anyAttribute processContents="lax"/>
             </xs:complexType>
 
-            <xs:complexType name="DeviceServiceSecurityCapabilities">
+            <xs:complexType name="SecurityCapabilities">
                 <xs:attribute name="TLS1.0" type="xs:boolean"/>
                 <xs:attribute name="TLS1.1" type="xs:boolean"/>
                 <xs:attribute name="TLS1.2" type="xs:boolean"/>
@@ -95,7 +95,7 @@
                 <xs:anyAttribute processContents="lax"/>
             </xs:complexType>
 
-            <xs:complexType name="DeviceServiceSystemCapabilities">
+            <xs:complexType name="SystemCapabilities">
                 <xs:attribute name="DiscoveryResolve" type="xs:boolean"/>
                 <xs:attribute name="DiscoveryBye" type="xs:boolean"/>
                 <xs:attribute name="RemoteDiscovery" type="xs:boolean"/>
@@ -111,9 +111,9 @@
 
             <xs:complexType name="DeviceServiceCapabilities">
                 <xs:sequence>
-                    <xs:element name="Network" type="tds:DeviceServiceNetworkCapabilities"/>
-                    <xs:element name="Security" type="tds:DeviceServiceSecurityCapabilities"/>
-                    <xs:element name="System" type="tds:DeviceServiceSystemCapabilities"/>
+                    <xs:element name="Network" type="tds:NetworkCapabilities"/>
+                    <xs:element name="Security" type="tds:SecurityCapabilities"/>
+                    <xs:element name="System" type="tds:SystemCapabilities"/>
                 </xs:sequence>
             </xs:complexType>
 
