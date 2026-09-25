@@ -9,6 +9,35 @@
         <xs:restriction base="xs:string"/>
     </xs:simpleType>
 
+    <xs:simpleType name="StreamType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="RTP-Unicast"/>
+            <xs:enumeration value="RTP-Multicast"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TransportProtocol">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="UDP"/>
+            <xs:enumeration value="TCP"/>
+            <xs:enumeration value="RTSP"/>
+            <xs:enumeration value="HTTP"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="Transport">
+        <xs:sequence>
+            <xs:element name="Protocol" type="tt:TransportProtocol"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="StreamSetup">
+        <xs:sequence>
+            <xs:element name="Stream" type="tt:StreamType"/>
+            <xs:element name="Transport" type="tt:Transport"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:simpleType name="ScopeDefinition">
         <xs:restriction base="xs:string">
             <xs:enumeration value="Fixed"/>
