@@ -15,6 +15,8 @@ class DiscoveryManager {
         this.listenSocket = null;
         this.listeningReadyPromise = null;
         this.recentProbes = [];
+        this.instanceId = Math.floor(Date.now() / 1000);
+        this.messageNumber = 0;
     }
 
     async startCamera(camera, onFatalError) {
@@ -327,14 +329,17 @@ class DiscoveryManager {
     }
 
     buildProbeMatchesResponse(entry, relatesTo) {
+        const appSequence = this.nextAppSequence();
+
         return `
 <SOAP-ENV:Envelope
     xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope"
     xmlns:wsa="http://schemas.xmlsoap.org/ws/2004/08/addressing"
     xmlns:wsd="http://schemas.xmlsoap.org/ws/2005/04/discovery"
+    xmlns:tds="http://www.onvif.org/ver10/device/wsdl"
     xmlns:dn="http://www.onvif.org/ver10/network/wsdl">
   <SOAP-ENV:Header>
-    <wsa:MessageID>urn:uuid:${this.generateSimpleId()}</wsa:MessageID>
+    <wsa:MessageID>${this.generateMessageId()}</wsa:MessageID>
     ${relatesTo ? `<wsa:RelatesTo>${relatesTo}</wsa:RelatesTo>` : ""}
     <wsa:To SOAP-ENV:mustUnderstand="true">
       http://schemas.xmlsoap.org/ws/2004/08/addressing/role/anonymous
@@ -342,7 +347,7 @@ class DiscoveryManager {
     <wsa:Action SOAP-ENV:mustUnderstand="true">
       http://schemas.xmlsoap.org/ws/2005/04/discovery/ProbeMatches
     </wsa:Action>
-    <wsd:AppSequence SOAP-ENV:mustUnderstand="true" InstanceId="1" MessageNumber="1" />
+    <wsd:AppSequence SOAP-ENV:mustUnderstand="true" InstanceId="${appSequence.instanceId}" MessageNumber="${appSequence.messageNumber}" />
   </SOAP-ENV:Header>
   <SOAP-ENV:Body>
     <wsd:ProbeMatches>
@@ -350,7 +355,7 @@ class DiscoveryManager {
         <wsa:EndpointReference>
           <wsa:Address>${entry.endpointAddress}</wsa:Address>
         </wsa:EndpointReference>
-        <wsd:Types>dn:NetworkVideoTransmitter</wsd:Types>
+        <wsd:Types>tds:Device dn:NetworkVideoTransmitter</wsd:Types>
         <wsd:Scopes>
           ${this.getDiscoveryScopes(entry.camera)}
         </wsd:Scopes>
@@ -362,11 +367,17 @@ class DiscoveryManager {
 </SOAP-ENV:Envelope>`.trim();
     }
 
-    generateSimpleId() {
-        // Not cryptographically strong, just unique enough for discovery messages
-        const rand = Math.floor(Math.random() * 1e9).toString(16);
-        const ts = Date.now().toString(16);
-        return `${ts}-${rand}`;
+    generateMessageId() {
+        return `urn:uuid:${crypto.randomUUID()}`;
+    }
+
+    nextAppSequence() {
+        this.messageNumber += 1;
+
+        return {
+            instanceId: this.instanceId,
+            messageNumber: this.messageNumber
+        };
     }
 
     extractMessageId(xml) {
