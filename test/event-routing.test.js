@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
     EVENT_SERVICE_PATH,
     PULLPOINT_SERVICE_PATH,
+    PULLPOINT_SERVICE_PATTERN,
     subscriptionIdFromUrl,
     rewritePullPointRequest,
     isEventServiceRequest
@@ -50,4 +51,30 @@ test("event request classifier includes base, fixed and dynamic Event paths", ()
         true
     );
     assert.equal(isEventServiceRequest("/onvif/media_service"), false);
+});
+
+
+test("PullPoint SOAP regex matches dynamic subscription paths", () => {
+    assert.equal(
+        PULLPOINT_SERVICE_PATTERN.test(
+            "/onvif/event_service/subscriptions/abc-123"
+        ),
+        true
+    );
+    assert.equal(
+        PULLPOINT_SERVICE_PATTERN.test(
+            "/onvif/event_service/subscriptions/abc-123/"
+        ),
+        true
+    );
+    assert.equal(
+        PULLPOINT_SERVICE_PATTERN.test(PULLPOINT_SERVICE_PATH),
+        false
+    );
+    assert.equal(
+        PULLPOINT_SERVICE_PATTERN.test(
+            "/onvif/event_service/subscriptions/abc-123/extra"
+        ),
+        false
+    );
 });
