@@ -11,7 +11,8 @@ const { EventBus } = require("./event-bus");
 const { DEFAULT_TOPICS } = require("./event-topics");
 const {
     EVENT_SERVICE_PATH,
-    PULLPOINT_SERVICE_PATTERN,
+    PULLPOINT_SERVICE_PATH,
+    rewritePullPointRequest,
     isEventServiceRequest
 } = require("./event-routing");
 const RtspProxyService = require("./services/rtsp-proxy-service");
@@ -274,13 +275,27 @@ class OnvifServer {
                         }
                     });
                     const pullPointSoapServer = soap.listen(server, {
-                        path: PULLPOINT_SERVICE_PATTERN,
+                        path: PULLPOINT_SERVICE_PATH,
                         services: pullPointServiceDef,
                         xml: eventWsdlXml,
                         forceSoap12Headers: true,
                         attributesKey: '$attributes',
                         wsdl_options: {
                             attributesKey: '$attributes'
+                        }
+                    });
+
+                    // node-soap wraps the HTTP server request listeners when mounted.
+                    // Install this after all SOAP listeners so dynamic PullPoint URLs are
+                    // normalized before node-soap performs its path/WSDL-port dispatch.
+                    server.prependListener("request", (req) => {
+                        const originalUrl = req.url;
+                        if (rewritePullPointRequest(req)) {
+                            logger.debug(
+                                "events",
+                                `Routed PullPoint request for ${this.camera.name}: ` +
+                                `${originalUrl} -> ${req.url} (subscription=${req.onvifSubscriptionId})`
+                            );
                         }
                     });
 
