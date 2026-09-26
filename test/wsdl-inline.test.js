@@ -112,3 +112,61 @@ test("node-soap loads the namespace-correct inlined Media WSDL", async () => {
         await closeServer(server);
     }
 });
+
+
+test("inlined Event WSDL preserves Event, WS-Notification, and ONVIF schema namespaces", () => {
+    const xml = inline("event_service.wsdl");
+
+    assert.match(
+        xml,
+        /<xs:schema[^>]*targetNamespace="http:\/\/www\.onvif\.org\/ver10\/events\/wsdl"/
+    );
+    assert.match(
+        xml,
+        /<xs:schema[^>]*targetNamespace="http:\/\/docs\.oasis-open\.org\/wsn\/b-2"/
+    );
+    assert.match(
+        xml,
+        /<xs:schema[^>]*targetNamespace="http:\/\/docs\.oasis-open\.org\/wsn\/t-1"/
+    );
+    assert.match(
+        xml,
+        /<xs:schema[\s\S]*targetNamespace="http:\/\/www\.onvif\.org\/ver10\/schema"/
+    );
+    assert.doesNotMatch(xml, /schemaLocation=["']types\.xsd["']/);
+});
+
+test("node-soap loads the namespace-correct inlined Event WSDL with both ports", async () => {
+    const xml = inline("event_service.wsdl");
+
+    const result = await new Promise((resolve, reject) => {
+        const server = http.createServer();
+
+        soap.listen(server, {
+            path: "/onvif/event_service",
+            services: {
+                EventService: {
+                    EventPort: {},
+                    PullPointSubscriptionPort: {}
+                }
+            },
+            xml,
+            forceSoap12Headers: true,
+            callback(err) {
+                if (err) {
+                    reject(err);
+                    return;
+                }
+                resolve(server);
+            }
+        });
+
+        server.listen(0, "127.0.0.1");
+    });
+
+    try {
+        assert.ok(result.listening);
+    } finally {
+        await closeServer(result);
+    }
+});
