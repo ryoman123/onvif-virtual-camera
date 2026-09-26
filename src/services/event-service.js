@@ -160,6 +160,9 @@ class EventService {
 
     async CreatePullPointSubscription(args) {
         try {
+            // Capacity is defined over active PullPoints. Remove expired
+            // subscriptions before enforcing the advertised MaxPullPoints limit.
+            this.eventBus.pruneExpired();
             if (this.eventBus.subscriptions.size >= this.maxPullPoints) {
                 throw new Error("maximum PullPoint subscriptions reached");
             }

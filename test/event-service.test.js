@@ -119,6 +119,36 @@ test("CreatePullPointSubscription returns a unique endpoint", async () => {
     assert.equal(bus.subscriptions.size, 1);
 });
 
+test("expired PullPoints do not consume subscription capacity", async () => {
+    const time = clock();
+    const bus = new EventBus({
+        topics: DEFAULT_TOPICS,
+        now: time.now
+    });
+    const service = new EventService(cameraFixture(), bus, {
+        now: time.now,
+        maxPullPoints: 1
+    });
+
+    await service.CreatePullPointSubscription({
+        InitialTerminationTime: "PT1S"
+    });
+    assert.equal(bus.subscriptions.size, 1);
+
+    time.advance(1001);
+
+    const replacement = await service.CreatePullPointSubscription({
+        InitialTerminationTime: "PT1M"
+    });
+
+    assert.match(replacement.SubscriptionReference.$xml, /subscriptions\//);
+    assert.equal(bus.subscriptions.size, 1);
+    assert.equal(
+        replacement.TerminationTime,
+        "2026-09-26T20:01:01.001Z"
+    );
+});
+
 test("PullMessages long-polls and serializes queued ONVIF events", async () => {
     const time = clock();
     const bus = new EventBus({
