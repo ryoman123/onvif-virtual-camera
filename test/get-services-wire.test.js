@@ -22,7 +22,8 @@ function cameraFixture() {
         },
         endpoints: {
             deviceServiceUrl: "http://127.0.0.1/onvif/device_service",
-            mediaServiceUrl: "http://127.0.0.1/onvif/media_service"
+            mediaServiceUrl: "http://127.0.0.1/onvif/media_service",
+            eventServiceUrl: "http://127.0.0.1/onvif/event_service"
         }
     };
 }
@@ -63,7 +64,7 @@ function startSoapServer() {
     });
 }
 
-test("GetServices wire response carries service-specific Device and Media capabilities", async () => {
+test("GetServices wire response carries Device, Media and Event capabilities", async () => {
     const server = await startSoapServer();
 
     try {
@@ -107,6 +108,15 @@ test("GetServices wire response carries service-specific Device and Media capabi
         assert.match(body, /RTPMulticast="false"/);
         assert.match(body, /RTP_TCP="true"/);
         assert.match(body, /RTP_RTSP_TCP="true"/);
+
+        assert.match(body, /http:\/\/www\.onvif\.org\/ver10\/events\/wsdl/);
+        assert.match(body, /http:\/\/127\.0\.0\.1\/onvif\/event_service/);
+        assert.match(
+            body,
+            /<tev:Capabilities[^>]*xmlns:tev="http:\/\/www\.onvif\.org\/ver10\/events\/wsdl"/
+        );
+        assert.match(body, /MaxPullPoints="32"/);
+        assert.match(body, /PersistentNotificationStorage="false"/);
     } finally {
         await new Promise((resolve) => server.close(resolve));
     }
