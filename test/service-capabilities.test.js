@@ -6,8 +6,10 @@ const MediaService = require("../src/services/media-service");
 const {
     buildDeviceServiceCapabilities,
     buildMediaServiceCapabilities,
+    buildEventServiceCapabilities,
     renderDeviceServiceCapabilitiesXml,
-    renderMediaServiceCapabilitiesXml
+    renderMediaServiceCapabilitiesXml,
+    renderEventServiceCapabilitiesXml
 } = require("../src/service-capabilities");
 
 global.runtime = { enable_debug_logs: false };
@@ -26,6 +28,7 @@ function cameraFixture() {
         endpoints: {
             deviceServiceUrl: "http://192.0.2.80/onvif/device_service",
             mediaServiceUrl: "http://192.0.2.80/onvif/media_service",
+            eventServiceUrl: "http://192.0.2.80/onvif/event_service",
             rtspUriHq: "rtsp://192.0.2.80:8554/main",
             rtspUriLq: "rtsp://192.0.2.80:8554/sub",
             snapshotUri: "http://192.0.2.80/snapshot.jpg"
@@ -75,20 +78,23 @@ test("GetServices omits service capabilities unless requested", async () => {
     const device = new DeviceService(cameraFixture());
     const response = await device.GetServices({ IncludeCapability: false });
 
-    assert.equal(response.Service.length, 2);
+    assert.equal(response.Service.length, 3);
     assert.equal(Object.hasOwn(response.Service[0], "Capabilities"), false);
     assert.equal(Object.hasOwn(response.Service[1], "Capabilities"), false);
+    assert.equal(Object.hasOwn(response.Service[2], "Capabilities"), false);
 });
 
-test("GetServices includes namespaced Device and Media service capabilities", async () => {
+test("GetServices includes namespaced Device, Media and Event service capabilities", async () => {
     const device = new DeviceService(cameraFixture());
     const response = await device.GetServices({ IncludeCapability: true });
 
     const deviceXml = response.Service[0].Capabilities.$xml;
     const mediaXml = response.Service[1].Capabilities.$xml;
+    const eventXml = response.Service[2].Capabilities.$xml;
 
     assert.equal(deviceXml, renderDeviceServiceCapabilitiesXml(buildDeviceServiceCapabilities()));
     assert.equal(mediaXml, renderMediaServiceCapabilitiesXml(buildMediaServiceCapabilities()));
+    assert.equal(eventXml, renderEventServiceCapabilitiesXml(buildEventServiceCapabilities()));
 
     assert.match(deviceXml, /<tds:Capabilities[^>]*xmlns:tds="http:\/\/www\.onvif\.org\/ver10\/device\/wsdl"/);
     assert.match(deviceXml, /DiscoveryResolve="true"/);
@@ -99,4 +105,20 @@ test("GetServices includes namespaced Device and Media service capabilities", as
     assert.match(mediaXml, /MaximumNumberOfProfiles="2"/);
     assert.match(mediaXml, /RTPMulticast="false"/);
     assert.match(mediaXml, /RTP_RTSP_TCP="true"/);
+
+    assert.match(eventXml, /<tev:Capabilities[^>]*xmlns:tev="http:\/\/www\.onvif\.org\/ver10\/events\/wsdl"/);
+    assert.match(eventXml, /MaxPullPoints="32"/);
+    assert.match(eventXml, /PersistentNotificationStorage="false"/);
+});
+
+test("legacy GetCapabilities advertises PullPoint Events support", async () => {
+    const device = new DeviceService(cameraFixture());
+    const response = await device.GetCapabilities({ Category: "Events" });
+
+    assert.deepEqual(response.Capabilities.Events, {
+        XAddr: "http://192.0.2.80/onvif/event_service",
+        WSSubscriptionPolicySupport: false,
+        WSPullPointSupport: true,
+        WSPausableSubscriptionManagerInterfaceSupport: false
+    });
 });
