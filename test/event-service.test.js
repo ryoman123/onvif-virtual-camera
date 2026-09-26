@@ -149,6 +149,31 @@ test("expired PullPoints do not consume subscription capacity", async () => {
     );
 });
 
+test("PullMessages accepts SOAP-wrapped MessageLimit scalars", async () => {
+    const bus = new EventBus({ topics: DEFAULT_TOPICS });
+    const service = new EventService(cameraFixture(), bus);
+
+    await service.CreatePullPointSubscription({});
+    const subscription = [...bus.subscriptions.values()][0];
+
+    bus.publish({
+        topic: TOPICS.MOTION,
+        data: { IsMotion: true }
+    });
+
+    const response = await service.PullMessages(
+        {
+            Timeout: { $value: "PT0S" },
+            MessageLimit: { $value: "1" }
+        },
+        null,
+        null,
+        { onvifSubscriptionId: subscription.id }
+    );
+
+    assert.equal(response.NotificationMessage.length, 1);
+});
+
 test("PullMessages long-polls and serializes queued ONVIF events", async () => {
     const time = clock();
     const bus = new EventBus({
