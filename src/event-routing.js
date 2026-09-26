@@ -1,5 +1,6 @@
 const EVENT_SERVICE_PATH = "/onvif/event_service";
 const PULLPOINT_SERVICE_PATH = "/onvif/event_service/subscriptions";
+const PULLPOINT_SERVICE_PATTERN = /^\\/onvif\\/event_service\\/subscriptions\\/[^/]+\\/?$/;
 
 function pathnameFromUrl(value) {
     try {
@@ -50,6 +51,7 @@ function isEventServiceRequest(value) {
 module.exports = {
     EVENT_SERVICE_PATH,
     PULLPOINT_SERVICE_PATH,
+    PULLPOINT_SERVICE_PATTERN,
     pathnameFromUrl,
     subscriptionIdFromUrl,
     rewritePullPointRequest,
