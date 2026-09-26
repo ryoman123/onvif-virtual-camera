@@ -286,7 +286,7 @@
             <soap:address location="http://0.0.0.0/onvif/event_service"/>
         </wsdl:port>
         <wsdl:port name="PullPointSubscriptionPort" binding="tev:PullPointSubscriptionBinding">
-            <soap:address location="http://0.0.0.0/onvif/event_service"/>
+            <soap:address location="http://0.0.0.0/onvif/event_service/subscriptions"/>
         </wsdl:port>
     </wsdl:service>
 </wsdl:definitions>
