@@ -347,3 +347,19 @@ test("unsubscribe releases a pending pull and removes the subscription", async (
         }
     );
 });
+
+
+test("releaseAllWaiters unblocks pending PullMessages", async () => {
+    const bus = new EventBus();
+    const sub = bus.createSubscription({ id: "shutdown-waiter" });
+
+    const pending = bus.pullAsync(sub.id, 10, 60000);
+
+    setTimeout(() => {
+        bus.releaseAllWaiters();
+    }, 20);
+
+    const result = await pending;
+
+    assert.deepEqual(result.messages, []);
+});
