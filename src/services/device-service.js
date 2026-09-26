@@ -3,8 +3,10 @@ const { getFixedScopeObjects } = require("../onvif-scopes");
 const {
     buildDeviceServiceCapabilities,
     buildMediaServiceCapabilities,
+    buildEventServiceCapabilities,
     renderDeviceServiceCapabilitiesXml,
-    renderMediaServiceCapabilitiesXml
+    renderMediaServiceCapabilitiesXml,
+    renderEventServiceCapabilitiesXml
 } = require("../service-capabilities");
 
 class DeviceService {
@@ -54,6 +56,15 @@ class DeviceService {
                     MaximumNumberOfProfiles: 2
                 }
             }
+        };
+    }
+
+    buildEventsCapabilities() {
+        return {
+            XAddr: this.camera.endpoints.eventServiceUrl,
+            WSSubscriptionPolicySupport: false,
+            WSPullPointSupport: true,
+            WSPausableSubscriptionManagerInterfaceSupport: false
         };
     }
 
@@ -158,6 +169,7 @@ class DeviceService {
         const allRequested = requested.length === 0 || requested.includes("All");
         const includeDevice = allRequested || requested.includes("Device");
         const includeMedia = allRequested || requested.includes("Media");
+        const includeEvents = allRequested || requested.includes("Events");
 
         const capabilities = {};
 
@@ -169,15 +181,20 @@ class DeviceService {
             capabilities.Media = this.buildMediaCapabilities();
         }
 
+        if (includeEvents) {
+            capabilities.Events = this.buildEventsCapabilities();
+        }
+
         logger.debug('device', 
             `GetCapabilities called for ${this.camera.name} ` +
             `(Category=${JSON.stringify(category)})`
         );
         logger.debug("device",
             `GetCapabilities response for ${this.camera.name}: ` +
-            `includeDevice=${includeDevice}, includeMedia=${includeMedia}, ` +
+            `includeDevice=${includeDevice}, includeMedia=${includeMedia}, includeEvents=${includeEvents}, ` +
             `deviceXAddr=${capabilities.Device && capabilities.Device.XAddr}, ` +
-            `mediaXAddr=${capabilities.Media && capabilities.Media.XAddr}`
+            `mediaXAddr=${capabilities.Media && capabilities.Media.XAddr}, ` +
+            `eventXAddr=${capabilities.Events && capabilities.Events.XAddr}`
         );
 
         return {
@@ -205,18 +222,30 @@ class DeviceService {
                     Major: 2,
                     Minor: 5
                 }
+            },
+            {
+                Namespace: "http://www.onvif.org/ver10/events/wsdl",
+                XAddr: this.camera.endpoints.eventServiceUrl,
+                Version: {
+                    Major: 2,
+                    Minor: 5
+                }
             }
         ];
 
         if (includeCapability) {
             const deviceCapabilities = buildDeviceServiceCapabilities();
             const mediaCapabilities = buildMediaServiceCapabilities();
+            const eventCapabilities = buildEventServiceCapabilities();
 
             services[0].Capabilities = {
                 $xml: renderDeviceServiceCapabilitiesXml(deviceCapabilities)
             };
             services[1].Capabilities = {
                 $xml: renderMediaServiceCapabilitiesXml(mediaCapabilities)
+            };
+            services[2].Capabilities = {
+                $xml: renderEventServiceCapabilitiesXml(eventCapabilities)
             };
         }
 
