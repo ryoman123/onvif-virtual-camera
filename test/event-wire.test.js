@@ -11,8 +11,7 @@ const { EventService } = require("../src/services/event-service");
 const { inlineTypesXsd } = require("../src/wsdl-loader");
 const {
     EVENT_SERVICE_PATH,
-    PULLPOINT_SERVICE_PATH,
-    rewritePullPointRequest,
+    PULLPOINT_SERVICE_PATTERN,
     isEventServiceRequest
 } = require("../src/event-routing");
 
@@ -71,10 +70,6 @@ async function startEventServer() {
         res.end("Not Found");
     });
 
-    server.prependListener("request", (req) => {
-        rewritePullPointRequest(req);
-    });
-
     const eventReady = new Promise((resolve, reject) => {
         soap.listen(server, {
             path: EVENT_SERVICE_PATH,
@@ -101,7 +96,7 @@ async function startEventServer() {
 
     const pullReady = new Promise((resolve, reject) => {
         soap.listen(server, {
-            path: PULLPOINT_SERVICE_PATH,
+            path: PULLPOINT_SERVICE_PATTERN,
             services: {
                 EventService: {
                     PullPointSubscriptionPort:
