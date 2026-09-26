@@ -11,8 +11,7 @@ const { EventBus } = require("./event-bus");
 const { DEFAULT_TOPICS } = require("./event-topics");
 const {
     EVENT_SERVICE_PATH,
-    PULLPOINT_SERVICE_PATH,
-    rewritePullPointRequest,
+    PULLPOINT_SERVICE_PATTERN,
     isEventServiceRequest
 } = require("./event-routing");
 const RtspProxyService = require("./services/rtsp-proxy-service");
@@ -197,20 +196,9 @@ class OnvifServer {
                 logger.error(`HTTP clientError for ${this.camera.name}: ${err.message}`);
             });
             server.prependListener("request", (req, res) => {
-                const originalUrl = req.url;
-                const rewrittenPullPoint = rewritePullPointRequest(req);
-
-                if (rewrittenPullPoint) {
-                    logger.debug(
-                        "events",
-                        `Routed PullPoint request for ${this.camera.name}: ` +
-                        `${originalUrl} -> ${req.url} (subscription=${req.onvifSubscriptionId})`
-                    );
-                }
-
                 logger.debug(
                     "http",
-                    `HTTP request for ${this.camera.name}: ${req.method} ${originalUrl} ` +
+                    `HTTP request for ${this.camera.name}: ${req.method} ${req.url} ` +
                     `from ${req.socket.remoteAddress}`
                 );
             });
@@ -286,7 +274,7 @@ class OnvifServer {
                         }
                     });
                     const pullPointSoapServer = soap.listen(server, {
-                        path: PULLPOINT_SERVICE_PATH,
+                        path: PULLPOINT_SERVICE_PATTERN,
                         services: pullPointServiceDef,
                         xml: eventWsdlXml,
                         forceSoap12Headers: true,
