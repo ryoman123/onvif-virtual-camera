@@ -6,6 +6,15 @@ const path = require("path");
 const logger = require("./log-manager");
 const DeviceService = require("./services/device-service");
 const MediaService = require("./services/media-service");
+const { EventService } = require("./services/event-service");
+const { EventBus } = require("./event-bus");
+const { DEFAULT_TOPICS } = require("./event-topics");
+const {
+    EVENT_SERVICE_PATH,
+    PULLPOINT_SERVICE_PATH,
+    rewritePullPointRequest,
+    isEventServiceRequest
+} = require("./event-routing");
 const RtspProxyService = require("./services/rtsp-proxy-service");
 const SnapshotService = require("./services/snapshot-service");
 const { UsernameTokenAuthenticator } = require("./ws-security");
@@ -38,6 +47,12 @@ class OnvifServer {
         this.discoveryManager = discoveryManager;
         this.deviceService = new DeviceService(camera);
         this.mediaService = new MediaService(camera);
+        this.eventBus = new EventBus({
+            topics: DEFAULT_TOPICS
+        });
+        this.eventService = new EventService(camera, this.eventBus, {
+            videoSourceConfigToken: this.mediaService.videoSourceConfigTokenHq
+        });
         this.rtspProxyService = new RtspProxyService(camera, (err) => this.failFatal(err));
         this.snapshotService = new SnapshotService(camera);
     }
@@ -52,8 +67,9 @@ class OnvifServer {
         const lifecycle = this.camera.lifecycle;
         logger.debug("lifecycle",
             `Camera lifecycle ready for ${this.camera.name}: ` +
-            `http=${lifecycle.httpReady}, snapshot=${lifecycle.snapshotReady}, ` +
-            `rtsp=${lifecycle.rtspProxyReady}, discovery=${lifecycle.discoveryReady}`
+            `http=${lifecycle.httpReady}, events=${lifecycle.eventReady}, ` +
+            `snapshot=${lifecycle.snapshotReady}, rtsp=${lifecycle.rtspProxyReady}, ` +
+            `discovery=${lifecycle.discoveryReady}`
         );
     }
 
@@ -131,7 +147,10 @@ class OnvifServer {
             logger.warn(`Failed to stop RTSP proxy for ${this.camera.name}: ${err.message}`);
         }
 
+        this.eventBus.releaseAllWaiters();
+
         this.camera.lifecycle.httpReady = false;
+        this.camera.lifecycle.eventReady = false;
         this.camera.lifecycle.snapshotReady = false;
 
         if (!this.httpServer) {
@@ -161,7 +180,11 @@ class OnvifServer {
                     return;
                 }
 
-                if (req.url && (req.url.startsWith("/onvif/device_service") || req.url.startsWith("/onvif/media_service"))) {
+                if (req.url && (
+                    req.url.startsWith("/onvif/device_service")
+                    || req.url.startsWith("/onvif/media_service")
+                    || isEventServiceRequest(req.url)
+                )) {
                     return;
                 }
 
@@ -174,7 +197,21 @@ class OnvifServer {
                 logger.error(`HTTP clientError for ${this.camera.name}: ${err.message}`);
             });
             server.prependListener("request", (req, res) => {
-                logger.debug('http', `HTTP request for ${this.camera.name}: ${req.method} ${req.url} from ${req.socket.remoteAddress}`
+                const originalUrl = req.url;
+                const rewrittenPullPoint = rewritePullPointRequest(req);
+
+                if (rewrittenPullPoint) {
+                    logger.debug(
+                        "events",
+                        `Routed PullPoint request for ${this.camera.name}: ` +
+                        `${originalUrl} -> ${req.url} (subscription=${req.onvifSubscriptionId})`
+                    );
+                }
+
+                logger.debug(
+                    "http",
+                    `HTTP request for ${this.camera.name}: ${req.method} ${originalUrl} ` +
+                    `from ${req.socket.remoteAddress}`
                 );
             });
 
@@ -182,9 +219,11 @@ class OnvifServer {
             const typesXsdPath = path.join(wsdlFolder, 'types.xsd');
             const deviceWsdlPath = path.join(wsdlFolder, 'device_service.wsdl');
             const mediaWsdlPath = path.join(wsdlFolder, 'media_service.wsdl');
+            const eventWsdlPath = path.join(wsdlFolder, 'event_service.wsdl');
             const typesXsdXml = fs.readFileSync(typesXsdPath, 'utf8');
             const deviceWsdlXml = inlineTypesXsd(fs.readFileSync(deviceWsdlPath, 'utf8'), typesXsdXml);
             const mediaWsdlXml = inlineTypesXsd(fs.readFileSync(mediaWsdlPath, 'utf8'), typesXsdXml);
+            const eventWsdlXml = inlineTypesXsd(fs.readFileSync(eventWsdlPath, 'utf8'), typesXsdXml);
 
             const deviceServiceDef = {
                 DeviceService: {
@@ -195,6 +234,18 @@ class OnvifServer {
             const mediaServiceDef = {
                 MediaService: {
                     MediaPort: this.mediaService.GetServiceDefinition()
+                }
+            };
+
+            const eventServiceDef = {
+                EventService: {
+                    EventPort: this.eventService.GetEventServiceDefinition()
+                }
+            };
+
+            const pullPointServiceDef = {
+                EventService: {
+                    PullPointSubscriptionPort: this.eventService.GetPullPointServiceDefinition()
                 }
             };
 
@@ -224,9 +275,31 @@ class OnvifServer {
                             attributesKey: '$attributes'
                         }
                     });
+                    const eventSoapServer = soap.listen(server, {
+                        path: EVENT_SERVICE_PATH,
+                        services: eventServiceDef,
+                        xml: eventWsdlXml,
+                        forceSoap12Headers: true,
+                        attributesKey: '$attributes',
+                        wsdl_options: {
+                            attributesKey: '$attributes'
+                        }
+                    });
+                    const pullPointSoapServer = soap.listen(server, {
+                        path: PULLPOINT_SERVICE_PATH,
+                        services: pullPointServiceDef,
+                        xml: eventWsdlXml,
+                        forceSoap12Headers: true,
+                        attributesKey: '$attributes',
+                        wsdl_options: {
+                            attributesKey: '$attributes'
+                        }
+                    });
 
                     deviceSoapServer.authenticate = (security) => this.authenticateRequest(security);
                     mediaSoapServer.authenticate = (security) => this.authenticateRequest(security);
+                    eventSoapServer.authenticate = (security) => this.authenticateRequest(security);
+                    pullPointSoapServer.authenticate = (security) => this.authenticateRequest(security);
 
                     deviceSoapServer.on("request", (xml, methodName) => {
                         this.lastSoapMethod = methodName;
@@ -242,6 +315,22 @@ class OnvifServer {
                     mediaSoapServer.on("error", (err) => {
                         logger.error(`SOAP Media error for ${this.camera.name}: ${err.message}`);
                     });
+                    eventSoapServer.on("request", (xml, methodName) => {
+                        this.lastSoapMethod = methodName;
+                        logger.debug("events", `SOAP Event request received for ${this.camera.name}: ${methodName}`);
+                    });
+                    eventSoapServer.on("error", (err) => {
+                        logger.error(`SOAP Event error for ${this.camera.name}: ${err.message}`);
+                    });
+                    pullPointSoapServer.on("request", (xml, methodName) => {
+                        this.lastSoapMethod = methodName;
+                        logger.debug("events", `SOAP PullPoint request received for ${this.camera.name}: ${methodName}`);
+                    });
+                    pullPointSoapServer.on("error", (err) => {
+                        logger.error(`SOAP PullPoint error for ${this.camera.name}: ${err.message}`);
+                    });
+
+                    this.camera.lifecycle.eventReady = true;
 
                     await this.discoveryManager.startCamera(this.camera, (err) => this.failFatal(err));
                     this.rtspProxyService.start();
