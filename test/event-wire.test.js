@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 const soap = require("soap");
+const OnvifServer = require("../src/onvif-server");
 
 const { EventBus } = require("../src/event-bus");
 const { DEFAULT_TOPICS, TOPICS } = require("../src/event-topics");
@@ -120,7 +121,9 @@ async function startEventServer() {
         });
     });
 
-    // Install after node-soap listeners so this runs before their path dispatch.
+    await Promise.all([eventReady, pullReady]);
+
+    // node-soap mounts asynchronously; wait before installing the outer rewrite.
     server.prependListener("request", (req) => {
         rewritePullPointRequest(req);
     });
@@ -128,7 +131,6 @@ async function startEventServer() {
     await new Promise((resolve) => {
         server.listen(0, "127.0.0.1", resolve);
     });
-    await Promise.all([eventReady, pullReady]);
 
     return {
         server,
@@ -153,8 +155,33 @@ async function closeServer(server) {
     ]);
 }
 
-test("Event SOAP wire supports CreatePullPointSubscription then dynamic PullMessages", async () => {
-    const { server, bus, port } = await startEventServer();
+async function startProductionServer() {
+    const camera = {
+        name: "Camera-Test",
+        ip: "127.0.0.1",
+        onvifPort: 0,
+        identity: { serialNumber: "test" },
+        lifecycle: {},
+        source: { snapshotUrl: "http://127.0.0.1/snapshot" },
+        endpoints: { eventServiceUrl: "http://127.0.0.1/onvif/event_service" }
+    };
+    // Exercise real SOAP startup without opening RTSP or multicast listeners.
+    const onvif = new OnvifServer(camera, {
+        async startCamera() {},
+        async stopCamera() {}
+    });
+    onvif.rtspProxyService.start = () => {};
+    await onvif.start();
+
+    return {
+        server: onvif.httpServer,
+        bus: onvif.eventBus,
+        port: onvif.httpServer.address().port
+    };
+}
+
+async function checkSubscriptionRoundTrip(startServer) {
+    const { server, bus, port } = await startServer();
 
     try {
         const createResponse = await soapPost(
@@ -220,7 +247,12 @@ test("Event SOAP wire supports CreatePullPointSubscription then dynamic PullMess
         bus.releaseAllWaiters();
         await closeServer(server);
     }
-});
+}
+
+for (const startServer of [startEventServer, startProductionServer]) {
+    test(`${startServer.name}: CreatePullPointSubscription then dynamic PullMessages`,
+        () => checkSubscriptionRoundTrip(startServer));
+}
 
 test("Event SOAP wire exposes service capabilities and topic properties", async () => {
     const { server, bus, port } = await startEventServer();

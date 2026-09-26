@@ -244,50 +244,34 @@ class OnvifServer {
                     this.camera.lifecycle.httpReady = true;
                     this.camera.lifecycle.snapshotReady = true;
 
-                    const deviceSoapServer = soap.listen(server, {
-                        path: "/onvif/device_service",
-                        services: deviceServiceDef,
-                        xml: deviceWsdlXml,
-                        forceSoap12Headers: true,
-                        attributesKey: '$attributes',
-                        wsdl_options: {
-                            attributesKey: '$attributes'
-                        }
-                    });
-                    const mediaSoapServer = soap.listen(server, {
-                        path: "/onvif/media_service",
-                        services: mediaServiceDef,
-                        xml: mediaWsdlXml,
-                        forceSoap12Headers: true,
-                        attributesKey: '$attributes',
-                        wsdl_options: {
-                            attributesKey: '$attributes'
-                        }
-                    });
-                    const eventSoapServer = soap.listen(server, {
-                        path: EVENT_SERVICE_PATH,
-                        services: eventServiceDef,
-                        xml: eventWsdlXml,
-                        forceSoap12Headers: true,
-                        attributesKey: '$attributes',
-                        wsdl_options: {
-                            attributesKey: '$attributes'
-                        }
-                    });
-                    const pullPointSoapServer = soap.listen(server, {
-                        path: PULLPOINT_SERVICE_PATH,
-                        services: pullPointServiceDef,
-                        xml: eventWsdlXml,
-                        forceSoap12Headers: true,
-                        attributesKey: '$attributes',
-                        wsdl_options: {
-                            attributesKey: '$attributes'
-                        }
-                    });
+                    // node-soap installs its HTTP listener only after WSDL loading.
+                    // Wait for every mount before putting URL rewriting ahead of them.
+                    const [deviceSoapServer, mediaSoapServer, eventSoapServer, pullPointSoapServer] =
+                        await Promise.all([
+                            ["/onvif/device_service", deviceServiceDef, deviceWsdlXml],
+                            ["/onvif/media_service", mediaServiceDef, mediaWsdlXml],
+                            [EVENT_SERVICE_PATH, eventServiceDef, eventWsdlXml],
+                            [PULLPOINT_SERVICE_PATH, pullPointServiceDef, eventWsdlXml]
+                        ].map(([servicePath, services, xml]) => new Promise((ready, failed) => {
+                            soap.listen(server, {
+                                path: servicePath,
+                                services,
+                                xml,
+                                forceSoap12Headers: true,
+                                attributesKey: '$attributes',
+                                wsdl_options: {
+                                    attributesKey: '$attributes'
+                                },
+                                callback(err, soapServer) {
+                                    if (err) {
+                                        failed(err);
+                                        return;
+                                    }
+                                    ready(soapServer);
+                                }
+                            });
+                        })));
 
-                    // node-soap wraps the HTTP server request listeners when mounted.
-                    // Install this after all SOAP listeners so dynamic PullPoint URLs are
-                    // normalized before node-soap performs its path/WSDL-port dispatch.
                     server.prependListener("request", (req) => {
                         const originalUrl = req.url;
                         if (rewritePullPointRequest(req)) {
