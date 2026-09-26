@@ -151,7 +151,9 @@ test("expired PullPoints do not consume subscription capacity", async () => {
 
 test("PullMessages accepts SOAP-wrapped MessageLimit scalars", async () => {
     const bus = new EventBus({ topics: DEFAULT_TOPICS });
-    const service = new EventService(cameraFixture(), bus);
+    const service = new EventService(cameraFixture(), bus, {
+        videoSourceConfigToken: "video_source_config_hq_test"
+    });
 
     await service.CreatePullPointSubscription({});
     const subscription = [...bus.subscriptions.values()][0];
