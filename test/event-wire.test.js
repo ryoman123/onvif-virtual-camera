@@ -25,7 +25,8 @@ function soapPost(port, requestPath, action, body) {
             "content-type":
                 `application/soap+xml; charset=utf-8; action="${action}"`
         },
-        body
+        body,
+        signal: AbortSignal.timeout(3000)
     });
 }
 
@@ -136,7 +137,19 @@ async function startEventServer() {
 }
 
 async function closeServer(server) {
-    await new Promise((resolve) => server.close(resolve));
+    if (typeof server.closeAllConnections === "function") {
+        server.closeAllConnections();
+    }
+
+    await Promise.race([
+        new Promise((resolve) => server.close(resolve)),
+        new Promise((_, reject) => {
+            setTimeout(
+                () => reject(new Error("event test server did not close")),
+                3000
+            );
+        })
+    ]);
 }
 
 test("Event SOAP wire supports CreatePullPointSubscription then dynamic PullMessages", async () => {
