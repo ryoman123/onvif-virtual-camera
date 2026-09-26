@@ -30,6 +30,7 @@ class CameraManager {
             ip: this.camera?.ip || null,
             deviceServiceUrl: this.camera?.endpoints?.deviceServiceUrl || null,
             mediaServiceUrl: this.camera?.endpoints?.mediaServiceUrl || null,
+            eventServiceUrl: this.camera?.endpoints?.eventServiceUrl || null,
             rtspUriHq: this.camera?.endpoints?.rtspUriHq || null,
             rtspUriLq: this.camera?.endpoints?.rtspUriLq || null,
             snapshotUri: this.camera?.endpoints?.snapshotUri || null,
@@ -57,6 +58,7 @@ class CameraManager {
             endpoints: {
                 deviceServiceUrl: `http://${network.ip}:${onvifPort}/onvif/device_service`,
                 mediaServiceUrl: `http://${network.ip}:${onvifPort}/onvif/media_service`,
+                eventServiceUrl: `http://${network.ip}:${onvifPort}/onvif/event_service`,
                 rtspUriHq: `rtsp://${network.ip}:${rtspProxyPort}${this.cameraConfig.rtspPathHq}`,
                 rtspUriLq: `rtsp://${network.ip}:${rtspProxyPort}${this.cameraConfig.rtspPathLq}`,
                 snapshotUri: `http://${network.ip}:${onvifPort}${this.cameraConfig.snapshotPath}`
