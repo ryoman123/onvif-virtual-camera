@@ -21,7 +21,10 @@ const {
     escapeXml
 } = require("../event-protocol");
 
+const WSNT_NAMESPACE = "http://docs.oasis-open.org/wsn/b-2";
+const WSTOP_NAMESPACE = "http://docs.oasis-open.org/wsn/t-1";
 const WSA_NAMESPACE = "http://www.w3.org/2005/08/addressing";
+const ONVIF_SCHEMA_NAMESPACE = "http://www.onvif.org/ver10/schema";
 const CONCRETE_SET_TOPIC_DIALECT = CONCRETE_SET_DIALECT;
 const MAX_SUBSCRIPTION_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_PULL_TIMEOUT_MS = 60000;
