@@ -1,4 +1,4 @@
-const { TOPICS, DEFAULT_TOPICS } = require("./event-topics");
+const { TOPICS, TOPIC_DEFINITIONS, DEFAULT_TOPICS, getTopicDefinition } = require("./event-topics");
 
 const EVENT_NAMESPACE = "http://www.onvif.org/ver10/events/wsdl";
 const TOPIC_NAMESPACE = "http://www.onvif.org/ver10/topics";
@@ -239,42 +239,79 @@ function renderNotificationMessage(event, options = {}) {
     ].join("");
 }
 
-function renderMessageDescription(dataName) {
+function renderMessageDescription(definition) {
+    const sourceDescriptions = (definition.source || [])
+        .map((item) =>
+            `<tt:SimpleItemDescription Name="${escapeXml(item.name)}" Type="${escapeXml(item.type)}"/>`
+        )
+        .join("");
+    const dataDescriptions = (definition.data || [])
+        .map((item) =>
+            `<tt:SimpleItemDescription Name="${escapeXml(item.name)}" Type="${escapeXml(item.type)}"/>`
+        )
+        .join("");
+
     return [
-        '<tt:MessageDescription IsProperty="true">',
-        "<tt:Source>",
-        '<tt:SimpleItemDescription Name="VideoSourceConfigurationToken" Type="tt:ReferenceToken"/>',
-        "</tt:Source>",
-        "<tt:Data>",
-        `<tt:SimpleItemDescription Name="${dataName}" Type="xs:boolean"/>`,
-        "</tt:Data>",
+        `<tt:MessageDescription IsProperty="${definition.isProperty !== false ? "true" : "false"}">`,
+        `<tt:Source>${sourceDescriptions}</tt:Source>`,
+        `<tt:Data>${dataDescriptions}</tt:Data>`,
         "</tt:MessageDescription>"
     ].join("");
 }
 
-function renderTopicSetXml() {
-    const motion = renderMessageDescription(topicDataName(TOPICS.MOTION));
-    const state = renderMessageDescription("State");
+function buildTopicTree(topics) {
+    const root = {};
+
+    for (const topic of topics) {
+        const definition = getTopicDefinition(topic);
+        if (!definition) {
+            continue;
+        }
+
+        const segments = definition.topic
+            .split("/")
+            .map((segment) => segment.trim())
+            .filter(Boolean);
+
+        let cursor = root;
+        for (const segment of segments) {
+            cursor[segment] ||= {};
+            cursor = cursor[segment];
+        }
+
+        cursor.$definition = definition;
+    }
+
+    return root;
+}
+
+function renderTopicTreeNode(name, node) {
+    const children = Object.entries(node)
+        .filter(([key]) => key !== "$definition")
+        .sort(([left], [right]) => left.localeCompare(right));
+    const definition = node.$definition;
+    const attributes = definition ? ' wstop:topic="true"' : "";
+    const body = [];
+
+    if (definition) {
+        body.push(renderMessageDescription(definition));
+    }
+
+    for (const [childName, childNode] of children) {
+        body.push(renderTopicTreeNode(childName, childNode));
+    }
+
+    return `<tns1:${name}${attributes}>${body.join("")}</tns1:${name}>`;
+}
+
+function renderTopicSetXml(topics = DEFAULT_TOPICS) {
+    const tree = buildTopicTree(topics);
 
     return [
         `<wstop:TopicSet xmlns:wstop="http://docs.oasis-open.org/wsn/t-1" xmlns:tns1="${TOPIC_NAMESPACE}" xmlns:tt="http://www.onvif.org/ver10/schema" xmlns:xs="http://www.w3.org/2001/XMLSchema">`,
-        "<tns1:RuleEngine>",
-        "<tns1:CellMotionDetector>",
-        `<tns1:Motion wstop:topic="true">${motion}</tns1:Motion>`,
-        "</tns1:CellMotionDetector>",
-        "</tns1:RuleEngine>",
-        "<tns1:UserAlarm>",
-        "<tns1:IVA>",
-        `<tns1:HumanShapeDetect wstop:topic="true">${state}</tns1:HumanShapeDetect>`,
-        `<tns1:AnimalDetect wstop:topic="true">${state}</tns1:AnimalDetect>`,
-        `<tns1:PackageDetect wstop:topic="true">${state}</tns1:PackageDetect>`,
-        "</tns1:IVA>",
-        "</tns1:UserAlarm>",
-        "<tns1:VehicleAlarm>",
-        "<tns1:IVB>",
-        `<tns1:VehicleDetect wstop:topic="true">${state}</tns1:VehicleDetect>`,
-        "</tns1:IVB>",
-        "</tns1:VehicleAlarm>",
+        ...Object.entries(tree)
+            .sort(([left], [right]) => left.localeCompare(right))
+            .map(([name, node]) => renderTopicTreeNode(name, node)),
         "</wstop:TopicSet>"
     ].join("");
 }
@@ -307,6 +344,8 @@ module.exports = {
     simpleValue,
     topicDataName,
     parseTopicFilter,
+    renderMessageDescription,
+    buildTopicTree,
     renderSimpleItems,
     renderNotificationMessage,
     renderTopicSetXml,
