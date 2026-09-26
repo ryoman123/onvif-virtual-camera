@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wsdl:definitions
+    xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/"
+    xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap12/"
+    xmlns:xs="http://www.w3.org/2001/XMLSchema"
+    xmlns:tev="http://www.onvif.org/ver10/events/wsdl"
+    xmlns:tt="http://www.onvif.org/ver10/schema"
+    xmlns:wsnt="http://docs.oasis-open.org/wsn/b-2"
+    xmlns:wstop="http://docs.oasis-open.org/wsn/t-1"
+    targetNamespace="http://www.onvif.org/ver10/events/wsdl">
+
+    <wsdl:types>
+        <xs:schema
+            targetNamespace="http://docs.oasis-open.org/wsn/b-2"
+            elementFormDefault="qualified">
+            <xs:element name="CurrentTime" type="xs:dateTime"/>
+            <xs:element name="TerminationTime" type="xs:dateTime"/>
+            <xs:element name="FixedTopicSet" type="xs:boolean"/>
+            <xs:element name="TopicExpressionDialect" type="xs:anyURI"/>
+            <xs:element name="NotificationMessage" type="xs:anyType"/>
+
+            <xs:element name="Renew">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="TerminationTime" type="xs:string"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="RenewResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element ref="wsnt:TerminationTime"/>
+                        <xs:element ref="wsnt:CurrentTime"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="Unsubscribe">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="UnsubscribeResponse">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+
+        <xs:schema
+            targetNamespace="http://docs.oasis-open.org/wsn/t-1"
+            elementFormDefault="qualified">
+            <xs:element name="TopicSet" type="xs:anyType"/>
+        </xs:schema>
+
+        <xs:schema
+            targetNamespace="http://www.onvif.org/ver10/events/wsdl"
+            elementFormDefault="qualified">
+            <xs:import
+                namespace="http://www.onvif.org/ver10/schema"
+                schemaLocation="types.xsd"/>
+            <xs:import namespace="http://docs.oasis-open.org/wsn/b-2"/>
+            <xs:import namespace="http://docs.oasis-open.org/wsn/t-1"/>
+
+            <xs:complexType name="Capabilities">
+                <xs:sequence>
+                    <xs:any namespace="##any" processContents="lax" minOccurs="0" maxOccurs="unbounded"/>
+                </xs:sequence>
+                <xs:attribute name="WSSubscriptionPolicySupport" type="xs:boolean"/>
+                <xs:attribute name="WSPausableSubscriptionManagerInterfaceSupport" type="xs:boolean"/>
+                <xs:attribute name="MaxNotificationProducers" type="xs:int"/>
+                <xs:attribute name="MaxPullPoints" type="xs:int"/>
+                <xs:attribute name="PersistentNotificationStorage" type="xs:boolean"/>
+                <xs:attribute name="EventBrokerProtocols" type="xs:string"/>
+                <xs:attribute name="MaxEventBrokers" type="xs:int"/>
+                <xs:attribute name="MetadataOverMQTT" type="xs:boolean"/>
+                <xs:anyAttribute processContents="lax"/>
+            </xs:complexType>
+
+            <xs:element name="GetServiceCapabilities">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetServiceCapabilitiesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Capabilities" type="tev:Capabilities"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="CreatePullPointSubscription">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Filter" type="xs:anyType" minOccurs="0"/>
+                        <xs:element name="InitialTerminationTime" type="xs:string" minOccurs="0"/>
+                        <xs:element name="SubscriptionPolicy" type="xs:anyType" minOccurs="0"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="CreatePullPointSubscriptionResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="SubscriptionReference" type="xs:anyType"/>
+                        <xs:element ref="wsnt:CurrentTime"/>
+                        <xs:element ref="wsnt:TerminationTime"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="GetEventProperties">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="GetEventPropertiesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="TopicNamespaceLocation" type="xs:anyURI" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element ref="wsnt:FixedTopicSet"/>
+                        <xs:element ref="wstop:TopicSet"/>
+                        <xs:element ref="wsnt:TopicExpressionDialect" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element name="MessageContentFilterDialect" type="xs:anyURI" minOccurs="1" maxOccurs="unbounded"/>
+                        <xs:element name="ProducerPropertiesFilterDialect" type="xs:anyURI" minOccurs="0" maxOccurs="unbounded"/>
+                        <xs:element name="MessageContentSchemaLocation" type="xs:anyURI" minOccurs="1" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="PullMessages">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element name="Timeout" type="xs:duration"/>
+                        <xs:element name="MessageLimit" type="xs:int"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="PullMessagesResponse">
+                <xs:complexType>
+                    <xs:sequence>
+                        <xs:element ref="wsnt:CurrentTime"/>
+                        <xs:element ref="wsnt:TerminationTime"/>
+                        <xs:element ref="wsnt:NotificationMessage" minOccurs="0" maxOccurs="unbounded"/>
+                    </xs:sequence>
+                </xs:complexType>
+            </xs:element>
+
+            <xs:element name="SetSynchronizationPoint">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+            <xs:element name="SetSynchronizationPointResponse">
+                <xs:complexType>
+                    <xs:sequence/>
+                </xs:complexType>
+            </xs:element>
+        </xs:schema>
+    </wsdl:types>
+
+    <wsdl:message name="GetServiceCapabilitiesRequest">
+        <wsdl:part name="parameters" element="tev:GetServiceCapabilities"/>
+    </wsdl:message>
+    <wsdl:message name="GetServiceCapabilitiesResponse">
+        <wsdl:part name="parameters" element="tev:GetServiceCapabilitiesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="CreatePullPointSubscriptionRequest">
+        <wsdl:part name="parameters" element="tev:CreatePullPointSubscription"/>
+    </wsdl:message>
+    <wsdl:message name="CreatePullPointSubscriptionResponse">
+        <wsdl:part name="parameters" element="tev:CreatePullPointSubscriptionResponse"/>
+    </wsdl:message>
+    <wsdl:message name="GetEventPropertiesRequest">
+        <wsdl:part name="parameters" element="tev:GetEventProperties"/>
+    </wsdl:message>
+    <wsdl:message name="GetEventPropertiesResponse">
+        <wsdl:part name="parameters" element="tev:GetEventPropertiesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="PullMessagesRequest">
+        <wsdl:part name="parameters" element="tev:PullMessages"/>
+    </wsdl:message>
+    <wsdl:message name="PullMessagesResponse">
+        <wsdl:part name="parameters" element="tev:PullMessagesResponse"/>
+    </wsdl:message>
+    <wsdl:message name="SetSynchronizationPointRequest">
+        <wsdl:part name="parameters" element="tev:SetSynchronizationPoint"/>
+    </wsdl:message>
+    <wsdl:message name="SetSynchronizationPointResponse">
+        <wsdl:part name="parameters" element="tev:SetSynchronizationPointResponse"/>
+    </wsdl:message>
+    <wsdl:message name="RenewRequest">
+        <wsdl:part name="parameters" element="wsnt:Renew"/>
+    </wsdl:message>
+    <wsdl:message name="RenewResponse">
+        <wsdl:part name="parameters" element="wsnt:RenewResponse"/>
+    </wsdl:message>
+    <wsdl:message name="UnsubscribeRequest">
+        <wsdl:part name="parameters" element="wsnt:Unsubscribe"/>
+    </wsdl:message>
+    <wsdl:message name="UnsubscribeResponse">
+        <wsdl:part name="parameters" element="wsnt:UnsubscribeResponse"/>
+    </wsdl:message>
+
+    <wsdl:portType name="EventPortType">
+        <wsdl:operation name="GetServiceCapabilities">
+            <wsdl:input message="tev:GetServiceCapabilitiesRequest"/>
+            <wsdl:output message="tev:GetServiceCapabilitiesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="CreatePullPointSubscription">
+            <wsdl:input message="tev:CreatePullPointSubscriptionRequest"/>
+            <wsdl:output message="tev:CreatePullPointSubscriptionResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="GetEventProperties">
+            <wsdl:input message="tev:GetEventPropertiesRequest"/>
+            <wsdl:output message="tev:GetEventPropertiesResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:portType name="PullPointSubscription">
+        <wsdl:operation name="PullMessages">
+            <wsdl:input message="tev:PullMessagesRequest"/>
+            <wsdl:output message="tev:PullMessagesResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="SetSynchronizationPoint">
+            <wsdl:input message="tev:SetSynchronizationPointRequest"/>
+            <wsdl:output message="tev:SetSynchronizationPointResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="Renew">
+            <wsdl:input message="tev:RenewRequest"/>
+            <wsdl:output message="tev:RenewResponse"/>
+        </wsdl:operation>
+        <wsdl:operation name="Unsubscribe">
+            <wsdl:input message="tev:UnsubscribeRequest"/>
+            <wsdl:output message="tev:UnsubscribeResponse"/>
+        </wsdl:operation>
+    </wsdl:portType>
+
+    <wsdl:binding name="EventBinding" type="tev:EventPortType">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <wsdl:operation name="GetServiceCapabilities">
+            <soap:operation soapAction="http://www.onvif.org/ver10/events/wsdl/EventPortType/GetServiceCapabilitiesRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="CreatePullPointSubscription">
+            <soap:operation soapAction="http://www.onvif.org/ver10/events/wsdl/EventPortType/CreatePullPointSubscriptionRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="GetEventProperties">
+            <soap:operation soapAction="http://www.onvif.org/ver10/events/wsdl/EventPortType/GetEventPropertiesRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:binding name="PullPointSubscriptionBinding" type="tev:PullPointSubscription">
+        <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+
+        <wsdl:operation name="PullMessages">
+            <soap:operation soapAction="http://www.onvif.org/ver10/events/wsdl/PullPointSubscription/PullMessagesRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="SetSynchronizationPoint">
+            <soap:operation soapAction="http://www.onvif.org/ver10/events/wsdl/PullPointSubscription/SetSynchronizationPointRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="Renew">
+            <soap:operation soapAction="http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/RenewRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+        <wsdl:operation name="Unsubscribe">
+            <soap:operation soapAction="http://docs.oasis-open.org/wsn/bw-2/SubscriptionManager/UnsubscribeRequest"/>
+            <wsdl:input><soap:body use="literal"/></wsdl:input>
+            <wsdl:output><soap:body use="literal"/></wsdl:output>
+        </wsdl:operation>
+    </wsdl:binding>
+
+    <wsdl:service name="EventService">
+        <wsdl:port name="EventPort" binding="tev:EventBinding">
+            <soap:address location="http://0.0.0.0/onvif/event_service"/>
+        </wsdl:port>
+        <wsdl:port name="PullPointSubscriptionPort" binding="tev:PullPointSubscriptionBinding">
+            <soap:address location="http://0.0.0.0/onvif/event_service"/>
+        </wsdl:port>
+    </wsdl:service>
+</wsdl:definitions>
