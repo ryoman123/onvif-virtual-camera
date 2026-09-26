@@ -11,7 +11,8 @@ const { EventService } = require("../src/services/event-service");
 const { inlineTypesXsd } = require("../src/wsdl-loader");
 const {
     EVENT_SERVICE_PATH,
-    PULLPOINT_SERVICE_PATTERN,
+    PULLPOINT_SERVICE_PATH,
+    rewritePullPointRequest,
     isEventServiceRequest
 } = require("../src/event-routing");
 
@@ -96,7 +97,7 @@ async function startEventServer() {
 
     const pullReady = new Promise((resolve, reject) => {
         soap.listen(server, {
-            path: PULLPOINT_SERVICE_PATTERN,
+            path: PULLPOINT_SERVICE_PATH,
             services: {
                 EventService: {
                     PullPointSubscriptionPort:
@@ -117,6 +118,11 @@ async function startEventServer() {
                 resolve();
             }
         });
+    });
+
+    // Install after node-soap listeners so this runs before their path dispatch.
+    server.prependListener("request", (req) => {
+        rewritePullPointRequest(req);
     });
 
     await new Promise((resolve) => {
