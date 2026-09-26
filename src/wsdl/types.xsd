@@ -221,10 +221,20 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="EventsCapabilities">
+        <xs:sequence>
+            <xs:element name="XAddr" type="xs:string" minOccurs="0"/>
+            <xs:element name="WSSubscriptionPolicySupport" type="xs:boolean" minOccurs="0"/>
+            <xs:element name="WSPullPointSupport" type="xs:boolean" minOccurs="0"/>
+            <xs:element name="WSPausableSubscriptionManagerInterfaceSupport" type="xs:boolean" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:complexType name="Capabilities">
         <xs:sequence>
             <xs:element name="Device" type="tt:DeviceCapabilities" minOccurs="0"/>
             <xs:element name="Media" type="tt:MediaCapabilities" minOccurs="0"/>
+            <xs:element name="Events" type="tt:EventsCapabilities" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
