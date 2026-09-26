@@ -1,5 +1,6 @@
 const DEVICE_NAMESPACE = "http://www.onvif.org/ver10/device/wsdl";
 const MEDIA_NAMESPACE = "http://www.onvif.org/ver10/media/wsdl";
+const { EVENT_NAMESPACE, buildEventServiceCapabilities } = require("./event-protocol");
 
 function buildDeviceServiceCapabilities() {
     return {
@@ -113,11 +114,18 @@ function renderMediaServiceCapabilitiesXml(capabilities = buildMediaServiceCapab
     ].join("");
 }
 
+function renderEventServiceCapabilitiesXml(capabilities = buildEventServiceCapabilities()) {
+    return `<tev:Capabilities xmlns:tev="${EVENT_NAMESPACE}" ${renderAttributes(capabilities.$attributes)} />`;
+}
+
 module.exports = {
     DEVICE_NAMESPACE,
     MEDIA_NAMESPACE,
+    EVENT_NAMESPACE,
     buildDeviceServiceCapabilities,
     buildMediaServiceCapabilities,
+    buildEventServiceCapabilities,
     renderDeviceServiceCapabilitiesXml,
-    renderMediaServiceCapabilitiesXml
+    renderMediaServiceCapabilitiesXml,
+    renderEventServiceCapabilitiesXml
 };
