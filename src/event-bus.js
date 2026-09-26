@@ -113,7 +113,8 @@ class EventBus {
             createdAt: nowMs,
             expiresAt: nowMs + ttlMs,
             topics,
-            queue: []
+            queue: [],
+            waiter: null
         };
 
         this.subscriptions.set(id, subscription);
@@ -154,6 +155,7 @@ class EventBus {
 
     unsubscribe(id) {
         const subscription = this.requireSubscription(id);
+        this.releaseWaiter(subscription);
         this.subscriptions.delete(id);
         return this.describeSubscription(subscription);
     }
@@ -200,6 +202,8 @@ class EventBus {
                     subscription.queue.length - this.maxQueue
                 );
             }
+
+            this.releaseWaiter(subscription);
         }
 
         return event;
@@ -218,6 +222,69 @@ class EventBus {
             subscription: this.describeSubscription(subscription),
             messages
         };
+    }
+
+    async pullAsync(id, messageLimit, timeoutMs = 0) {
+        const subscription = this.requireSubscription(id);
+        const limit = normalizeMessageLimit(messageLimit);
+        const requestedTimeout = Number(timeoutMs);
+
+        if (!Number.isFinite(requestedTimeout) || requestedTimeout < 0) {
+            throw new Error("timeoutMs must be a non-negative number");
+        }
+
+        if (subscription.queue.length > 0 || requestedTimeout === 0) {
+            return this.pull(id, limit);
+        }
+
+        if (subscription.waiter) {
+            throw new EventSubscriptionError(
+                "concurrent-pull",
+                `subscription already has a pending pull: ${id}`
+            );
+        }
+
+        const remainingLifetime = Math.max(
+            0,
+            subscription.expiresAt - this.now() - 1
+        );
+        const waitMs = Math.min(
+            Math.floor(requestedTimeout),
+            remainingLifetime
+        );
+
+        if (waitMs <= 0) {
+            return this.pull(id, limit);
+        }
+
+        await new Promise((resolve) => {
+            const waiter = {
+                resolve,
+                timer: null
+            };
+
+            waiter.timer = setTimeout(() => {
+                if (subscription.waiter === waiter) {
+                    subscription.waiter = null;
+                }
+                resolve();
+            }, waitMs);
+
+            subscription.waiter = waiter;
+        });
+
+        return this.pull(id, limit);
+    }
+
+    releaseWaiter(subscription) {
+        const waiter = subscription && subscription.waiter;
+        if (!waiter) {
+            return;
+        }
+
+        subscription.waiter = null;
+        clearTimeout(waiter.timer);
+        waiter.resolve();
     }
 
     setSynchronizationPoint(id) {
@@ -249,6 +316,10 @@ class EventBus {
             );
         }
 
+        if (queued > 0) {
+            this.releaseWaiter(subscription);
+        }
+
         return queued;
     }
 
@@ -257,6 +328,7 @@ class EventBus {
 
         for (const [id, subscription] of this.subscriptions.entries()) {
             if (subscription.expiresAt <= nowMs) {
+                this.releaseWaiter(subscription);
                 this.subscriptions.delete(id);
             }
         }
