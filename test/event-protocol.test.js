@@ -67,6 +67,33 @@ test("topic filters accept exact topics, namespace prefixes, unions, and parent 
     );
 });
 
+test("topic filters reject unsupported expression dialects", () => {
+    assert.throws(
+        () => parseTopicFilter({
+            TopicExpression: {
+                $value: "tns1:RuleEngine/CellMotionDetector/Motion",
+                $attributes: {
+                    Dialect: "urn:example:unsupported-topic-dialect"
+                }
+            }
+        }),
+        (error) => error instanceof UnsupportedTopicFilterError &&
+            /unsupported topic expression dialect/.test(error.message)
+    );
+
+    assert.deepEqual(
+        Array.from(parseTopicFilter({
+            TopicExpression: {
+                $value: "tns1:RuleEngine/CellMotionDetector/Motion",
+                $attributes: {
+                    Dialect: CONCRETE_SET_DIALECT
+                }
+            }
+        })),
+        [TOPICS.MOTION]
+    );
+});
+
 test("unknown topic filters fail closed", () => {
     assert.throws(
         () => parseTopicFilter({

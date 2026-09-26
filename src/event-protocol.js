@@ -164,6 +164,54 @@ function parseTopicFilter(filter, knownTopics = DEFAULT_TOPICS) {
         return null;
     }
 
+    const supportedDialects = new Set([
+        CONCRETE_TOPIC_DIALECT,
+        CONCRETE_SET_DIALECT
+    ]);
+    const topicExpressions = [];
+
+    function collectTopicExpressionNodes(value) {
+        if (Array.isArray(value)) {
+            for (const item of value) {
+                collectTopicExpressionNodes(item);
+            }
+            return;
+        }
+
+        if (!value || typeof value !== "object") {
+            return;
+        }
+
+        for (const [key, item] of Object.entries(value)) {
+            if (/TopicExpression$/i.test(key)) {
+                if (Array.isArray(item)) {
+                    topicExpressions.push(...item);
+                } else {
+                    topicExpressions.push(item);
+                }
+            } else if (key === "Filter") {
+                collectTopicExpressionNodes(item);
+            }
+        }
+    }
+
+    collectTopicExpressionNodes(filter);
+
+    for (const expression of topicExpressions) {
+        const attributes = expression && typeof expression === "object"
+            ? expression.$attributes
+            : null;
+        const dialect = extractScalar(
+            attributes && (attributes.Dialect ?? attributes.dialect)
+        );
+
+        if (dialect && !supportedDialects.has(dialect)) {
+            throw new UnsupportedTopicFilterError(
+                `unsupported topic expression dialect: ${dialect}`
+            );
+        }
+    }
+
     const expressions = collectTopicExpressions(filter)
         .flatMap((expression) => String(expression).split(/\s*\|\s*|\s+/))
         .map(normalizeTopicExpression)
