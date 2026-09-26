@@ -18,7 +18,8 @@ const {
     renderNotificationMessage,
     renderTopicSetXml,
     buildEventServiceCapabilities,
-    escapeXml
+    escapeXml,
+    extractScalar
 } = require("../event-protocol");
 
 const WSNT_NAMESPACE = "http://docs.oasis-open.org/wsn/b-2";
@@ -48,7 +49,7 @@ function normalizePullTimeout(value) {
 }
 
 function normalizeMessageLimit(value) {
-    const parsed = Number(value);
+    const parsed = Number(extractScalar(value));
     if (!Number.isInteger(parsed) || parsed <= 0) {
         throw new Error("PullMessages MessageLimit must be a positive integer");
     }
