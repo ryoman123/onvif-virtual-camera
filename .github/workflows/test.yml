@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - protocol-hardening
+      - grand-design
   pull_request:
     branches:
       - main
