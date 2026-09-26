@@ -287,6 +287,12 @@ class EventBus {
         waiter.resolve();
     }
 
+    releaseAllWaiters() {
+        for (const subscription of this.subscriptions.values()) {
+            this.releaseWaiter(subscription);
+        }
+    }
+
     setSynchronizationPoint(id) {
         const subscription = this.requireSubscription(id);
         const nowIso = new Date(this.now()).toISOString();
