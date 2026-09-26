@@ -247,7 +247,8 @@ test("notification XML escapes values and uses ONVIF Message semantics", () => {
 
     assert.match(xml, /PropertyOperation="Changed"/);
     assert.match(xml, /A&amp;B&lt;&quot;rule&quot;&gt;/);
-    assert.match(xml, /Name="VideoSourceConfigurationToken" Value="video_source_config_hq_test"/);\n    assert.match(xml, /Name="State" Value="true"/);
+    assert.match(xml, /Name="VideoSourceConfigurationToken" Value="video_source_config_hq_test"/);
+    assert.match(xml, /Name="State" Value="true"/);
 });
 
 test("topic set XML contains the registered detection hierarchy", () => {
