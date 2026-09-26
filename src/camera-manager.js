@@ -38,6 +38,7 @@ class CameraManager {
                 configLoaded: !!lifecycle.configLoaded,
                 networkResolved: !!lifecycle.networkResolved,
                 httpReady: !!lifecycle.httpReady,
+                eventReady: !!lifecycle.eventReady,
                 snapshotReady: !!lifecycle.snapshotReady,
                 rtspProxyReady: !!lifecycle.rtspProxyReady,
                 discoveryReady: !!lifecycle.discoveryReady
@@ -78,6 +79,7 @@ class CameraManager {
                 networkResolved: true,
                 rtspProxyReady: false,
                 httpReady: false,
+                eventReady: false,
                 snapshotReady: false,
                 discoveryReady: false
             }
