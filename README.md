@@ -244,3 +244,18 @@ leaving camera services available. The MQTT client reconnects automatically.
 
 This integration still requires live Protect interoperability validation before
 smart detections can be claimed as visible in Protect.
+
+## Optional Lorex/Dahua recorder analytics
+
+Set `analytics.recorders` using the example in `resources/config-example.yml`.
+Each recorder opens the native `eventManager.cgi` event stream with HTTP Digest
+authentication and maps recorder channel numbers to existing virtual-camera
+names. Motion, human, and vehicle Start/Stop records then enter the same
+normalized ONVIF event path as Frigate.
+
+`username_env` and `password_env` are environment-variable names. The URL must
+not contain credentials, and credentials must not be committed to `config.yml`.
+The transport detects stalled or closed streams and reconnects with bounded
+exponential backoff. Channel numbering differs across recorder firmware, so the
+`channel_map` is intentionally explicit and must be verified against live event
+records before field deployment.

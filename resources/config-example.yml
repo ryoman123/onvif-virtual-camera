@@ -21,6 +21,18 @@ runtime:
 #       front: VirtualCam1
 #     username_env: MQTT_USER
 #     password_env: MQTT_PASS
+#   recorders:
+#     - name: lorex-primary
+#       source: lorex-primary
+#       url: http://192.168.1.61/cgi-bin/eventManager.cgi?action=attach&codes=[All]
+#       username_env: LOREX_USER
+#       password_env: LOREX_PASS
+#       channel_map:
+#         0: VirtualCam1
+#         1: VirtualCam2
+#       reconnect_min_ms: 1000
+#       reconnect_max_ms: 30000
+#       inactivity_timeout_ms: 90000
 
 host_sources:
   - name: cam1

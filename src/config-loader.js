@@ -205,10 +205,16 @@ function loadConfig(configPath) {
 }
 
 function normalizeAnalyticsConfig(value, cameras) {
-    if (value == null) return { frigate: null };
+    if (value == null) return { frigate: null, recorders: [] };
     if (typeof value !== "object" || Array.isArray(value)) throw new Error("analytics must be an object.");
-    if (value.frigate == null) return { frigate: null };
-    const frigate = value.frigate;
+    return {
+        frigate: normalizeFrigateConfig(value.frigate, cameras),
+        recorders: normalizeRecorderConfigs(value.recorders, cameras)
+    };
+}
+
+function normalizeFrigateConfig(frigate, cameras) {
+    if (frigate == null) return null;
     if (typeof frigate !== "object" || Array.isArray(frigate)) throw new Error("analytics.frigate must be an object.");
     const url = frigate.url;
     if (typeof url !== "string" || !/^(mqtt|mqtts):\/\/[^\s@/]+(?::\d+)?\/?$/.test(url)) {
@@ -235,10 +241,61 @@ function normalizeAnalyticsConfig(value, cameras) {
     if (frigate.topic_prefix != null && (typeof frigate.topic_prefix !== "string" || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(frigate.topic_prefix))) {
         throw new Error("analytics.frigate.topic_prefix must be a valid MQTT topic prefix.");
     }
-    return { frigate: {
+    return {
         url, cameraMap: { ...cameraMap }, topicPrefix: frigate.topic_prefix || "frigate",
         usernameEnv: frigate.username_env || null, passwordEnv: frigate.password_env || null
-    } };
+    };
+}
+
+function normalizeRecorderConfigs(recorders, cameras) {
+    if (recorders == null) return [];
+    if (!Array.isArray(recorders)) throw new Error("analytics.recorders must be an array.");
+    const cameraNames = new Set(cameras.map((camera) => camera.name));
+    const recorderNames = new Set();
+    return recorders.map((recorder, index) => {
+        const label = `analytics.recorders[${index}]`;
+        if (!recorder || typeof recorder !== "object" || Array.isArray(recorder)) throw new Error(`${label} must be an object.`);
+        const name = normalizeOptionalString(recorder.name, `${label}.name`);
+        if (!name) throw new Error(`${label}.name is required.`);
+        if (recorderNames.has(name)) throw new Error(`Duplicate analytics recorder name '${name}'.`);
+        recorderNames.add(name);
+        let parsedUrl;
+        try { parsedUrl = new URL(recorder.url); }
+        catch { throw new Error(`${label}.url must be a valid HTTP or HTTPS URL.`); }
+        if (!["http:", "https:"].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+            throw new Error(`${label}.url must be an HTTP or HTTPS URL without credentials.`);
+        }
+        const usernameEnv = normalizeEnvironmentName(recorder.username_env, `${label}.username_env`);
+        const passwordEnv = normalizeEnvironmentName(recorder.password_env, `${label}.password_env`);
+        if (!usernameEnv || !passwordEnv) throw new Error(`${label} must set username_env and password_env.`);
+        const channelMap = recorder.channel_map;
+        if (!channelMap || typeof channelMap !== "object" || Array.isArray(channelMap) || !Object.keys(channelMap).length) {
+            throw new Error(`${label}.channel_map must map recorder channels to virtual cameras.`);
+        }
+        const normalizedMap = {};
+        for (const [channel, target] of Object.entries(channelMap)) {
+            if (!/^(0|[1-9][0-9]*)$/.test(channel) || typeof target !== "string" || !cameraNames.has(target)) {
+                throw new Error(`${label}.channel_map has invalid mapping for '${channel}'.`);
+            }
+            normalizedMap[channel] = target;
+        }
+        const reconnectMinMs = recorder.reconnect_min_ms == null ? 1000 : normalizePositiveInteger(recorder.reconnect_min_ms, `${label}.reconnect_min_ms`);
+        const reconnectMaxMs = recorder.reconnect_max_ms == null ? 30000 : normalizePositiveInteger(recorder.reconnect_max_ms, `${label}.reconnect_max_ms`);
+        if (reconnectMaxMs < reconnectMinMs) throw new Error(`${label}.reconnect_max_ms must be at least reconnect_min_ms.`);
+        return {
+            name, source: normalizeOptionalString(recorder.source, `${label}.source`) || name,
+            url: parsedUrl.toString(), usernameEnv, passwordEnv, channelMap: normalizedMap,
+            reconnectMinMs, reconnectMaxMs,
+            inactivityTimeoutMs: recorder.inactivity_timeout_ms == null ? 90000 : normalizePositiveInteger(recorder.inactivity_timeout_ms, `${label}.inactivity_timeout_ms`)
+        };
+    });
+}
+
+function normalizeEnvironmentName(value, label) {
+    if (typeof value !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+        throw new Error(`${label} must name an environment variable.`);
+    }
+    return value;
 }
 
 function resolveStreamDetails(cam, runtime, streamKind) {

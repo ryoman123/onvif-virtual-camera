@@ -8,25 +8,43 @@ const { stopCameraManagers } = require("./src/shutdown-manager");
 const { AnalyticsCoordinator } = require("./src/analytics-coordinator");
 const { FrigateMqttRouter } = require("./src/frigate-mqtt-router");
 const { FrigateMqttRuntime } = require("./src/frigate-mqtt-runtime");
+const { DahuaAnalyticsRouter, DahuaRecorderRuntime } = require("./src/dahua-recorder-runtime");
+const { DahuaEventTransport } = require("./src/dahua-event-transport");
 
-function configureAnalytics(config, coordinator, env = process.env, connect = require("mqtt").connect) {
+function configureAnalytics(config, coordinator, env = process.env, connect = require("mqtt").connect, recorderRequest) {
     const frigate = config.analytics?.frigate;
-    if (!frigate) return;
-    const connectionOptions = {};
-    if (frigate.usernameEnv) {
-        const username = env[frigate.usernameEnv];
-        const password = env[frigate.passwordEnv];
-        if (!username || !password) throw new Error("Frigate MQTT credentials are missing from environment");
-        connectionOptions.username = username;
-        connectionOptions.password = password;
+    if (frigate) {
+        const connectionOptions = {};
+        if (frigate.usernameEnv) {
+            const username = env[frigate.usernameEnv];
+            const password = env[frigate.passwordEnv];
+            if (!username || !password) throw new Error("Frigate MQTT credentials are missing from environment");
+            connectionOptions.username = username;
+            connectionOptions.password = password;
+        }
+        const router = new FrigateMqttRouter({ cameraMap: frigate.cameraMap, topicPrefix: frigate.topicPrefix });
+        const runtime = new FrigateMqttRuntime({
+            connect: (options) => connect(frigate.url, options),
+            connectionOptions, router, dispatcher: coordinator.dispatcher
+        });
+        runtime.on("runtimeError", (error) => logger.warn(`Frigate MQTT error: ${error.message}`));
+        coordinator.addRuntime("frigate", runtime);
     }
-    const router = new FrigateMqttRouter({ cameraMap: frigate.cameraMap, topicPrefix: frigate.topicPrefix });
-    const runtime = new FrigateMqttRuntime({
-        connect: (options) => connect(frigate.url, options),
-        connectionOptions, router, dispatcher: coordinator.dispatcher
-    });
-    runtime.on("runtimeError", (error) => logger.warn(`Frigate MQTT error: ${error.message}`));
-    coordinator.addRuntime("frigate", runtime);
+
+    for (const recorder of config.analytics?.recorders || []) {
+        const username = env[recorder.usernameEnv];
+        const password = env[recorder.passwordEnv];
+        if (!username || !password) throw new Error(`Recorder '${recorder.name}' credentials are missing from environment`);
+        const router = new DahuaAnalyticsRouter({ source: recorder.source, channelMap: recorder.channelMap });
+        const analyticsRuntime = new DahuaRecorderRuntime({ router, dispatcher: coordinator.dispatcher });
+        const transport = new DahuaEventTransport({
+            url: recorder.url, username, password, runtime: analyticsRuntime, request: recorderRequest,
+            reconnectMinMs: recorder.reconnectMinMs, reconnectMaxMs: recorder.reconnectMaxMs,
+            inactivityTimeoutMs: recorder.inactivityTimeoutMs
+        });
+        transport.on("runtimeError", (error) => logger.warn(`Recorder '${recorder.name}' event stream error: ${error.message}`));
+        coordinator.addRuntime(`recorder:${recorder.name}`, transport);
+    }
 }
 
 async function start() {

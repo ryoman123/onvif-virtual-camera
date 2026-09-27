@@ -37,3 +37,41 @@ test("missing MQTT secret fails without starting an adapter", () => {
     } } }, coordinator, { MQTT_USER: "viewer" }), /credentials are missing/);
     assert.equal(coordinator.runtimes.length, 0);
 });
+
+test("configured recorder owns authenticated event transport lifecycle", async () => {
+    const coordinator = new AnalyticsCoordinator();
+    const requests = [];
+    const request = (options, callback) => {
+        const handle = new EventEmitter();
+        handle.end = () => {
+            requests.push(options);
+            const response = new EventEmitter();
+            response.statusCode = 200;
+            response.headers = {};
+            response.destroy = () => {};
+            queueMicrotask(() => callback(response));
+        };
+        handle.destroy = () => {};
+        return handle;
+    };
+    configureAnalytics({ analytics: { recorders: [{
+        name: "lorex", source: "lorex", url: "http://recorder/events",
+        usernameEnv: "NVR_USER", passwordEnv: "NVR_PASS", channelMap: { 0: "Camera-Test" },
+        reconnectMinMs: 1000, reconnectMaxMs: 30000, inactivityTimeoutMs: 60000
+    }] } }, coordinator, { NVR_USER: "viewer", NVR_PASS: "secret" }, undefined, request);
+    await coordinator.start();
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(requests.length, 1);
+    assert.equal(coordinator.health().adapters["recorder:lorex"].state, "connected");
+    await coordinator.stop();
+    assert.equal(coordinator.health().state, "stopped");
+});
+
+test("missing recorder secret prevents adapter registration", () => {
+    const coordinator = new AnalyticsCoordinator();
+    assert.throws(() => configureAnalytics({ analytics: { recorders: [{
+        name: "lorex", source: "lorex", url: "http://recorder/events",
+        usernameEnv: "NVR_USER", passwordEnv: "NVR_PASS", channelMap: { 0: "Camera-Test" }
+    }] } }, coordinator, { NVR_USER: "viewer" }), /credentials are missing/);
+    assert.equal(coordinator.runtimes.length, 0);
+});

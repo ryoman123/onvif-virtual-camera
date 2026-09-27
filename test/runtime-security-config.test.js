@@ -66,6 +66,40 @@ test("Frigate mapping validates configured virtual camera names", () => {
     assert.throws(() => loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://user:password@broker\n    camera_map:\n      front: Camera-Test\n`), /without credentials/);
 });
 
+test("recorder analytics validates secret references and explicit channel mapping", () => {
+    const valid = loadYaml(baseConfig() + `
+analytics:
+  recorders:
+    - name: lorex-primary
+      url: http://192.0.2.21/cgi-bin/eventManager.cgi?action=attach&codes=[All]
+      username_env: LOREX_USER
+      password_env: LOREX_PASS
+      channel_map:
+        0: Camera-Test
+`);
+    assert.deepEqual(valid.analytics.recorders[0].channelMap, { 0: "Camera-Test" });
+    assert.equal(valid.analytics.recorders[0].usernameEnv, "LOREX_USER");
+    assert.equal(valid.analytics.recorders[0].url.includes("@"), false);
+    assert.throws(() => loadYaml(baseConfig() + `
+analytics:
+  recorders:
+    - name: unsafe
+      url: http://admin:password@192.0.2.21/events
+      username_env: USER
+      password_env: PASS
+      channel_map: { 0: Camera-Test }
+`), /without credentials/);
+    assert.throws(() => loadYaml(baseConfig() + `
+analytics:
+  recorders:
+    - name: wrong-map
+      url: http://192.0.2.21/events
+      username_env: USER
+      password_env: PASS
+      channel_map: { 0: Missing-Camera }
+`), /invalid mapping/);
+});
+
 test("WS-Security defaults are audit-first and frozen", () => {
     const { runtime } = loadYaml(baseConfig());
 
