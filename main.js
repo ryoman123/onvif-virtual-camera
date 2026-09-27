@@ -6,11 +6,14 @@ const CameraManager = require("./src/camera-manager");
 const DiscoveryManager = require("./src/discovery-manager");
 const { stopCameraManagers } = require("./src/shutdown-manager");
 const { AnalyticsRuntimeManager } = require("./src/analytics-runtime-manager");
+const { DiagnosticsServer, buildSystemHealth } = require("./src/diagnostics-server");
 
 async function start() {
     const startupSummaries = [];
     const managers = [];
+    const processStartedAt = Date.now();
     let analyticsManager = null;
+    let diagnosticsServer = null;
     let shuttingDown = false;
 
     logger.info("Starting ONVIF Virtual Camera Server...");
@@ -21,7 +24,17 @@ async function start() {
         }
 
         shuttingDown = true;
-        logger.info(`Graceful shutdown requested (${reason}); stopping analytics and ${managers.length} virtual camera(s)...`);
+        logger.info(`Graceful shutdown requested (${reason}); stopping diagnostics, analytics and ${managers.length} virtual camera(s)...`);
+
+        if (diagnosticsServer) {
+            try {
+                await diagnosticsServer.stop();
+            } catch (error) {
+                logger.error(`Failed to stop diagnostics server: ${error.message}`);
+                if (exitCode === 0) exitCode = 1;
+            }
+            diagnosticsServer = null;
+        }
 
         if (analyticsManager) {
             try {
@@ -97,6 +110,30 @@ async function start() {
         logger.error(`Failed to initialize analytics runtime: ${err.message}`);
         await shutdown("analytics startup failure", 1);
         return;
+    }
+
+    if (config.runtime.diagnostics.enabled) {
+        try {
+            diagnosticsServer = new DiagnosticsServer({
+                host: config.runtime.diagnostics.host,
+                port: config.runtime.diagnostics.port,
+                healthProvider: () => buildSystemHealth({
+                    cameraManagers: managers,
+                    analyticsManager,
+                    startedAt: processStartedAt
+                })
+            });
+            await diagnosticsServer.start();
+            const address = diagnosticsServer.address();
+            logger.info(
+                `Diagnostics ready at http://${address.address}:${address.port} ` +
+                `(/healthz, /status)`
+            );
+        } catch (err) {
+            logger.error(`Failed to start diagnostics server: ${err.message}`);
+            await shutdown("diagnostics startup failure", 1);
+            return;
+        }
     }
 
     logger.info(`Initialization complete. ${startupSummaries.length} virtual camera(s) running.`);
