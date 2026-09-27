@@ -107,6 +107,12 @@ analytics:
 
 Person, vehicle, animal, package, and motion state is normalized before publication. Overlapping detections are aggregated so one source cannot clear an ONVIF state while another contributor remains active.
 
+### UniFi Protect third-party camera behavior
+
+Protect treats ONVIF cameras as third-party devices. The ONVIF event path can provide standard motion events through PullPoint, using the widely recognized `tns1:RuleEngine/CellMotionDetector/Motion` topic. Frigate person/vehicle events are also exposed as standard ONVIF analytics topics.
+
+Protect does **not** generally expose native smart-detection/person/vehicle recording features for third-party ONVIF cameras by itself. Those features normally require a UniFi AI Port or native Protect camera. This project therefore targets reliable motion/event interoperability while keeping Frigate inference external and recording in Protect.
+
 ### Frigate AI Sidecar Deployment
 
 The repository can generate a Frigate deployment directly from the bridge camera inventory. The generated deployment is intentionally an **AI sidecar**: it uses each virtual camera's configured LQ source for object detection, publishes detections over MQTT, and leaves recording to UniFi Protect.
