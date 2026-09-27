@@ -147,6 +147,7 @@ test("event capabilities advertise PullPoint capacity without unsupported featur
 
     assert.deepEqual(capabilities.$attributes, {
         WSSubscriptionPolicySupport: false,
+        WSPullPointSupport: true,
         WSPausableSubscriptionManagerInterfaceSupport: false,
         MaxNotificationProducers: 1,
         MaxPullPoints: 16,
