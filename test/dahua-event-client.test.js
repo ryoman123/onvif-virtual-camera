@@ -27,7 +27,7 @@ function parseAuthorization(header) {
     return result;
 }
 
-test("Digest-auth recorder stream reaches the mapped ONVIF PullPoint bus", async () => {
+test("Digest-auth recorder stream reaches the mapped ONVIF PullPoint bus", { timeout: 5000 }, async () => {
     const realm = "Dahua";
     const nonce = "0123456789abcdef";
     const username = "admin";
