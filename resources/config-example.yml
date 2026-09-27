@@ -3,6 +3,10 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  diagnostics:
+    enabled: true
+    host: "127.0.0.1"
+    port: 9090
   ws_security:
     mode: audit
     max_age_seconds: 300

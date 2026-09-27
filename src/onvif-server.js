@@ -134,6 +134,14 @@ class OnvifServer {
         return true;
     }
 
+    health() {
+        return Object.freeze({
+            lifecycle: Object.freeze({ ...this.camera.lifecycle }),
+            rtsp: this.rtspProxyService.health(),
+            events: this.eventBus.health()
+        });
+    }
+
     async stop() {
         try {
             await this.discoveryManager.stopCamera(this.camera);

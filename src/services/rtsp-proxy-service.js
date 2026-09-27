@@ -71,6 +71,13 @@ class RtspProxyService {
         this.camera.lifecycle.rtspProxyReady = true;
     }
 
+    health() {
+        return Object.freeze({
+            ready: !!this.proxy && this.camera.lifecycle.rtspProxyReady === true,
+            activeSessions: this.loggedSessions.size
+        });
+    }
+
     stop() {
         if (!this.proxy) {
             return;

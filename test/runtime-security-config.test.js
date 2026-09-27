@@ -103,3 +103,46 @@ test("negative future clock skew is rejected", () => {
         /runtime\.ws_security\.future_skew_seconds/
     );
 });
+
+
+test("diagnostics defaults are local-only and frozen", () => {
+    const { runtime } = loadYaml(baseConfig());
+
+    assert.deepEqual(runtime.diagnostics, {
+        enabled: true,
+        host: "127.0.0.1",
+        port: 9090
+    });
+    assert.equal(Object.isFrozen(runtime.diagnostics), true);
+});
+
+test("diagnostics configuration validates enable flag, host, and port", () => {
+    const { runtime } = loadYaml(baseConfig(`
+  diagnostics:
+    enabled: false
+    host: "0.0.0.0"
+    port: 9191`));
+
+    assert.deepEqual(runtime.diagnostics, {
+        enabled: false,
+        host: "0.0.0.0",
+        port: 9191
+    });
+
+    assert.throws(
+        () => loadYaml(baseConfig(`
+  diagnostics:
+    enabled: true
+    host: ""
+    port: 9090`)),
+        /runtime\.diagnostics\.host/
+    );
+
+    assert.throws(
+        () => loadYaml(baseConfig(`
+  diagnostics:
+    enabled: true
+    port: 70000`)),
+        /runtime\.diagnostics\.port/
+    );
+});

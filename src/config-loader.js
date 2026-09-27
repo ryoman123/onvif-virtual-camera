@@ -18,6 +18,11 @@ function getDefaultRuntime() {
         probe_streams: true,
         probe_timeout_ms: 15000,
         ip_monitor_interval_ms: 5000,
+        diagnostics: {
+            enabled: true,
+            host: "127.0.0.1",
+            port: 9090
+        },
         ws_security: {
             mode: "audit",
             max_age_seconds: 300,
@@ -94,12 +99,17 @@ function loadConfig(configPath) {
     const runtime = {
         ...defaultRuntime,
         ...(config.runtime || {}),
+        diagnostics: {
+            ...defaultRuntime.diagnostics,
+            ...((config.runtime && config.runtime.diagnostics) || {})
+        },
         ws_security: {
             ...defaultRuntime.ws_security,
             ...((config.runtime && config.runtime.ws_security) || {})
         }
     };
     validateRuntimeSettings(runtime);
+    runtime.diagnostics = Object.freeze({ ...runtime.diagnostics });
     runtime.ws_security = Object.freeze({ ...runtime.ws_security });
     global.runtime = Object.freeze(runtime);
 
@@ -611,6 +621,21 @@ function validateRuntimeSettings(runtime) {
 
     normalizePositiveInteger(runtime.probe_timeout_ms, "runtime.probe_timeout_ms");
     normalizePositiveInteger(runtime.ip_monitor_interval_ms, "runtime.ip_monitor_interval_ms");
+
+    if (!runtime.diagnostics || typeof runtime.diagnostics !== "object" || Array.isArray(runtime.diagnostics)) {
+        throw new Error("runtime.diagnostics must be an object.");
+    }
+    if (typeof runtime.diagnostics.enabled !== "boolean") {
+        throw new Error("runtime.diagnostics.enabled must be true or false.");
+    }
+    normalizeOptionalString(runtime.diagnostics.host, "runtime.diagnostics.host");
+    const diagnosticsPort = normalizePositiveInteger(
+        runtime.diagnostics.port,
+        "runtime.diagnostics.port"
+    );
+    if (diagnosticsPort > 65535) {
+        throw new Error("runtime.diagnostics.port must be between 1 and 65535.");
+    }
 
     if (!runtime.ws_security || typeof runtime.ws_security !== "object" || Array.isArray(runtime.ws_security)) {
         throw new Error("runtime.ws_security must be an object.");

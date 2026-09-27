@@ -34,6 +34,10 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  diagnostics:
+    enabled: true
+    host: "127.0.0.1"
+    port: 9090
   ws_security:
     mode: audit
     max_age_seconds: 300
@@ -46,6 +50,9 @@ runtime:
 - `probe_streams`: Probe source streams with `ffprobe` when a camera does not define `stream_hq` and `stream_lq` blocks.
 - `probe_timeout_ms`: Timeout for RTSP stream probing.
 - `ip_monitor_interval_ms`: Interval used to check for IP address changes due to DHCP.
+- `diagnostics.enabled`: Enables the read-only health/status listener. It is enabled by default.
+- `diagnostics.host`: Defaults to `127.0.0.1`, keeping the unauthenticated diagnostics listener local to the bridge host/container network namespace.
+- `diagnostics.port`: Defaults to `9090`.
 - `ws_security.mode`: `audit` preserves compatible authentication while logging freshness/replay findings; `enforce` rejects UsernameTokens that violate the configured replay policy.
 - `ws_security.max_age_seconds`: Maximum age of a UsernameToken `Created` timestamp.
 - `ws_security.future_skew_seconds`: Allowed client clock lead before a `Created` timestamp is considered invalid.
@@ -53,6 +60,23 @@ runtime:
 - `ws_security.allow_password_text`: Keeps PasswordText compatibility available. Disable only after confirming every client uses PasswordDigest.
 
 The default is deliberately `audit`: valid credentials continue to work while missing/stale timestamps and nonce replays are surfaced. Switch to `enforce` only after verifying the ONVIF client behavior you actually use.
+
+### Runtime Health and Diagnostics
+
+The bridge exposes two read-only diagnostics endpoints on `127.0.0.1:9090` by default:
+
+```bash
+curl -s http://127.0.0.1:9090/healthz
+curl -s http://127.0.0.1:9090/status
+```
+
+- `/healthz` is a compact readiness probe. It returns HTTP `200` when all virtual cameras are ready and every enabled analytics runtime is connected, or HTTP `503` when the bridge is degraded.
+- `/status` returns the detailed runtime snapshot: per-camera lifecycle state, interface/IP, RTSP session counts, PullPoint queue/subscription counters, Frigate MQTT health, and native recorder health.
+- Diagnostics deliberately omit source RTSP URLs and credentials.
+- The production Docker image uses `/healthz` for its native `HEALTHCHECK`, so `docker ps` reports the container's readiness automatically.
+- If diagnostics are explicitly disabled, the Docker healthcheck treats that as intentional and exits successfully.
+
+Binding diagnostics to a non-loopback address makes the unauthenticated status endpoint reachable from other hosts. Keep the default loopback bind unless external monitoring specifically requires otherwise and the network path is appropriately restricted.
 
 ### Frigate Analytics Events
 
