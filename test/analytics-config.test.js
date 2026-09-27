@@ -132,3 +132,18 @@ analytics:
         "0": MissingCam
 `)), /unknown virtual camera/);
 });
+
+
+test("Frigate camera_map auto derives stable names from virtual cameras", () => {
+    const config = load(yaml(`
+analytics:
+  frigate:
+    enabled: true
+    broker: mqtt://192.0.2.20:1883
+    camera_map: auto
+`));
+
+    assert.deepEqual(config.analytics.frigate.camera_map, {
+        virtualcam1: "VirtualCam1"
+    });
+});
