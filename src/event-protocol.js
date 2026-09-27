@@ -271,7 +271,10 @@ function renderNotificationMessage(event, options = {}) {
 
     const source = {
         VideoSourceConfigurationToken: videoSourceConfigToken,
-        ...(topic === TOPICS.MOTION ? { RuleName: "MotionDetector" } : {}),
+        ...(topic === TOPICS.MOTION ? {
+            VideoAnalyticsConfigurationToken: options.videoAnalyticsConfigToken || "video_analytics_config",
+            Rule: "MotionDetector"
+        } : {}),
         ...(event.source || {})
     };
 

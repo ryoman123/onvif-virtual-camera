@@ -250,7 +250,8 @@ async function checkSubscriptionRoundTrip(startServer) {
             /video_source_config_hq_test/
         );
         assert.match(pullBody, /tns1:RuleEngine\/CellMotionDetector\/Motion/);
-        assert.match(pullBody, /Name="RuleName" Value="MotionDetector"/);
+        assert.match(pullBody, /Name="VideoAnalyticsConfigurationToken" Value="video_analytics_config"/);
+        assert.match(pullBody, /Name="Rule" Value="MotionDetector"/);
         assert.match(pullBody, /Name="IsMotion" Value="true"/);
         assert.match(pullBody, /Name="State"/);
         assert.match(pullBody, /Value="true"/);
@@ -294,7 +295,8 @@ test("Event SOAP wire exposes service capabilities and topic properties", async 
         assert.equal(propsResponse.status, 200);
         assert.match(propsBody, /GetEventPropertiesResponse/);
         assert.match(propsBody, /CellMotionDetector/);
-        assert.match(propsBody, /SimpleItemDescription Name="RuleName" Type="xs:string"/);
+        assert.match(propsBody, /SimpleItemDescription Name="VideoAnalyticsConfigurationToken" Type="tt:ReferenceToken"/);
+        assert.match(propsBody, /SimpleItemDescription Name="Rule" Type="xs:string"/);
         assert.match(propsBody, /HumanShapeDetect/);
         assert.match(propsBody, /VehicleDetect/);
     } finally {

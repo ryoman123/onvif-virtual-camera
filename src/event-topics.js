@@ -17,7 +17,11 @@ const TOPIC_DEFINITIONS = Object.freeze([
                 type: "tt:ReferenceToken"
             }),
             Object.freeze({
-                name: "RuleName",
+                name: "VideoAnalyticsConfigurationToken",
+                type: "tt:ReferenceToken"
+            }),
+            Object.freeze({
+                name: "Rule",
                 type: "xs:string"
             })
         ]),
