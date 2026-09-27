@@ -9,7 +9,7 @@ function parseArgs(argv) {
     const args = {
         input: "./config.yml",
         outputDir: "./frigate-sidecar",
-        detectFps: 5,
+        detectFps: 3,
         force: false
     };
 
@@ -23,6 +23,8 @@ function parseArgs(argv) {
             args.outputDir = argv[++i];
         } else if (arg === "--detect-fps") {
             args.detectFps = Number(argv[++i]);
+        } else if (arg === "--openvino-threads") {
+            args.openvinoThreads = Number(argv[++i]);
         } else if (arg === "--mqtt-ca-certs") {
             args.mqttCaCerts = argv[++i];
         } else if (arg === "--help" || arg === "-h") {
@@ -46,6 +48,7 @@ function usage() {
         "  --input PATH          Bridge config.yml (default: ./config.yml)",
         "  --output-dir PATH     Output directory (default: ./frigate-sidecar)",
         "  --detect-fps NUMBER   Maximum detection FPS per camera (default: 5)",
+        "  --openvino-threads N   OpenVINO CPU threads (default: 3)",
         "  --mqtt-ca-certs PATH  CA bundle path inside Frigate for mqtts://",
         "  --force               Replace generated files if they already exist",
         "  -h, --help            Show this help"
@@ -74,6 +77,7 @@ function main() {
     const config = yaml.load(raw);
     const bundle = generateFrigateBundle(config, {
         detectFps: args.detectFps,
+        openvinoThreads: args.openvinoThreads,
         mqttCaCerts: args.mqttCaCerts
     });
 

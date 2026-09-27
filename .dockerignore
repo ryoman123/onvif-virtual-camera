@@ -1,6 +1,0 @@
-.git
-.github
-*.md
-.gitignore
-# Ignore local config so the container uses the one on the Debian host
-config.yml

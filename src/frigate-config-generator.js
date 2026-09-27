@@ -130,7 +130,7 @@ function generateFrigateBundle(config, options = {}) {
 
     const mqtt = parseMqtt(config, options);
     const trackedObjects = options.trackedObjects || DEFAULT_TRACKED_OBJECTS;
-    const detectFps = Number(options.detectFps ?? 5);
+    const detectFps = Number(options.detectFps ?? 3);
     if (!Number.isInteger(detectFps) || detectFps <= 0) {
         throw new Error("detectFps must be a positive integer");
     }
@@ -145,6 +145,22 @@ function generateFrigateBundle(config, options = {}) {
         },
         record: { enabled: false },
         snapshots: { enabled: false },
+        detectors: {
+            ov: {
+                type: "openvino",
+                device: "CPU",
+                num_threads: Number(options.openvinoThreads ?? 3)
+            }
+        },
+        model: {
+            width: 300,
+            height: 300,
+            input_tensor: "nhwc",
+            input_pixel_format: "bgr",
+            model_type: "ssd",
+            path: "/openvino-model/ssdlite_mobilenet_v2.xml",
+            labelmap_path: "/openvino-model/coco_91cl_bkgr.txt"
+        },
         objects: { track: [...trackedObjects] },
         go2rtc: { streams: {} },
         cameras: {}
