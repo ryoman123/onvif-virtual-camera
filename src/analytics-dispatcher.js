@@ -86,23 +86,19 @@ class AnalyticsDispatcher extends EventEmitter {
 
     dispatch(input) {
         const inputEvent = normalizeAnalyticsEvent(input);
+        const target = this.resolveTarget(inputEvent.camera);
+        if (!target) {
+            this.emit("unmapped", inputEvent.camera);
+            return null;
+        }
+        if (!target.eventBus || typeof target.eventBus.publish !== "function") {
+            throw new Error("analytics target for " + inputEvent.camera + " has no event bus");
+        }
         const analytics = this.aggregatePropertyState(inputEvent);
 
         if (!analytics) {
             this.emit("suppressed", inputEvent);
             return null;
-        }
-
-        const target = this.resolveTarget(analytics.camera);
-        if (!target) {
-            this.emit("unmapped", analytics.camera);
-            return null;
-        }
-
-        if (!target.eventBus || typeof target.eventBus.publish !== "function") {
-            throw new Error(
-                "analytics target for " + analytics.camera + " has no event bus"
-            );
         }
 
         const onvif = toOnvifEvent(analytics, {

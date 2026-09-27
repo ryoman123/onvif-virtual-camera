@@ -245,6 +245,22 @@ leaving camera services available. The MQTT client reconnects automatically.
 This integration still requires live Protect interoperability validation before
 smart detections can be claimed as visible in Protect.
 
+To use Frigate's object tracking as Protect motion detection, set
+`motion_mode: objects` and `motion_labels: [person, vehicle]` under
+`analytics.frigate`. This mode ignores Frigate's raw motion topic: only selected
+tracked object classes generate ONVIF motion Start/Stop state, so general
+lighting or foliage motion does not create a Protect motion event. Each object
+still publishes its own standard ONVIF analytics topic for other consumers.
+The default `motion_mode: raw` preserves the previous behavior.
+
+Protect's current third-party camera support documents motion detection but
+does not support importing third-party object classifications as native Protect
+smart detections. Frigate person/vehicle events therefore appear in Protect as
+motion if Protect accepts this virtual camera's PullPoint events. Confirm with
+a real event on one camera before enabling all 29. For Protect's own person or
+vehicle smart-detection timeline on a third-party camera, Ubiquiti documents
+the AI Port as the supported route.
+
 ## Optional Lorex/Dahua recorder analytics
 
 Set `analytics.recorders` using the example in `resources/config-example.yml`.

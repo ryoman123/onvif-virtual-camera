@@ -86,3 +86,15 @@ test("dispatcher resolves live target providers and drops unknown cameras safely
     }), null);
     assert.deepEqual(unmapped, ["MissingCam"]);
 });
+
+test("a detection while its camera is offline can publish when the camera returns", () => {
+    const bus = new EventBus({ topics: DEFAULT_TOPICS });
+    const dispatcher = new AnalyticsDispatcher();
+    let online = false;
+    dispatcher.registerTarget("Camera", () => online ? { eventBus: bus, videoSourceConfigToken: "source" } : null);
+    const event = { source: "frigate", camera: "Camera", type: "person", objectId: "one", active: true };
+    assert.equal(dispatcher.dispatch(event), null);
+    online = true;
+    assert.ok(dispatcher.dispatch(event));
+    assert.equal(bus.retained.size, 1);
+});

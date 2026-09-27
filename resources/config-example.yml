@@ -17,6 +17,8 @@ runtime:
 #   frigate:
 #     url: mqtt://192.168.1.60:1883
 #     topic_prefix: frigate
+#     motion_mode: objects # Only tracked objects create Protect motion events
+#     motion_labels: [person, vehicle]
 #     camera_map:
 #       front: VirtualCam1
 #     username_env: MQTT_USER

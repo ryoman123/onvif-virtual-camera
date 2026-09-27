@@ -241,9 +241,17 @@ function normalizeFrigateConfig(frigate, cameras) {
     if (frigate.topic_prefix != null && (typeof frigate.topic_prefix !== "string" || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(frigate.topic_prefix))) {
         throw new Error("analytics.frigate.topic_prefix must be a valid MQTT topic prefix.");
     }
+    if (frigate.motion_mode != null && !["raw", "objects"].includes(frigate.motion_mode)) {
+        throw new Error("analytics.frigate.motion_mode must be 'raw' or 'objects'.");
+    }
+    const motionLabels = frigate.motion_labels ?? ["person", "vehicle"];
+    if (!Array.isArray(motionLabels) || !motionLabels.length || motionLabels.some((label) => !["person", "vehicle", "animal", "package"].includes(label))) {
+        throw new Error("analytics.frigate.motion_labels must contain supported object classes.");
+    }
     return {
         url, cameraMap: { ...cameraMap }, topicPrefix: frigate.topic_prefix || "frigate",
-        usernameEnv: frigate.username_env || null, passwordEnv: frigate.password_env || null
+        usernameEnv: frigate.username_env || null, passwordEnv: frigate.password_env || null,
+        motionMode: frigate.motion_mode || "raw", motionLabels: [...new Set(motionLabels)]
     };
 }
 

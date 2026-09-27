@@ -7,10 +7,14 @@ class FrigateMqttRouter extends EventEmitter {
         super();
         this.topicPrefix = String(options.topicPrefix || "frigate").replace(/\/+$/, "");
         this.cameraMap = new Map(Object.entries(options.cameraMap || {}));
+        this.motionMode = options.motionMode || "raw";
+        this.motionLabels = new Set(options.motionLabels || ["person", "vehicle"]);
         this.available = null;
     }
     topics() {
-        return [this.topicPrefix + "/available", this.topicPrefix + "/events", this.topicPrefix + "/+/motion"];
+        const topics = [this.topicPrefix + "/available", this.topicPrefix + "/events"];
+        if (this.motionMode === "raw") topics.push(this.topicPrefix + "/+/motion");
+        return topics;
     }
     route(topic, payload) {
         const value = Buffer.isBuffer(payload) ? payload.toString("utf8") : String(payload);
@@ -26,10 +30,14 @@ class FrigateMqttRouter extends EventEmitter {
             if (!mapped) { this.emit("unmapped", event.camera); return []; }
             const routed = normalizeAnalyticsEvent({ ...event, camera: mapped });
             this.emit("analytics", routed);
-            return [routed];
+            if (this.motionMode !== "objects" || !this.motionLabels.has(routed.type)) return [routed];
+            const motion = normalizeAnalyticsEvent({ ...routed, type: "motion" });
+            this.emit("analytics", motion);
+            return [routed, motion];
         }
         const prefix = this.topicPrefix + "/";
         if (!topic.startsWith(prefix) || !topic.endsWith("/motion")) return [];
+        if (this.motionMode !== "raw") return [];
         const camera = topic.slice(prefix.length, -"/motion".length);
         if (!camera || camera.includes("/")) return [];
         const mapped = this.cameraMap.get(camera);

@@ -62,6 +62,10 @@ function loadYaml(yaml) {
 test("Frigate mapping validates configured virtual camera names", () => {
     const valid = loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://192.0.2.20:1883\n    camera_map:\n      front: Camera-Test\n    username_env: MQTT_USER\n    password_env: MQTT_PASS\n`);
     assert.deepEqual(valid.analytics.frigate.cameraMap, { front: "Camera-Test" });
+    assert.equal(valid.analytics.frigate.motionMode, "raw");
+    const objectMode = loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://192.0.2.20:1883\n    camera_map:\n      front: Camera-Test\n    motion_mode: objects\n    motion_labels: [person, vehicle]\n`);
+    assert.equal(objectMode.analytics.frigate.motionMode, "objects");
+    assert.deepEqual(objectMode.analytics.frigate.motionLabels, ["person", "vehicle"]);
     assert.throws(() => loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://192.0.2.20:1883\n    camera_map:\n      front: Wrong-Camera\n`), /invalid mapping/);
     assert.throws(() => loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://user:password@broker\n    camera_map:\n      front: Camera-Test\n`), /without credentials/);
 });

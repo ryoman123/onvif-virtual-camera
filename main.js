@@ -22,7 +22,10 @@ function configureAnalytics(config, coordinator, env = process.env, connect = re
             connectionOptions.username = username;
             connectionOptions.password = password;
         }
-        const router = new FrigateMqttRouter({ cameraMap: frigate.cameraMap, topicPrefix: frigate.topicPrefix });
+        const router = new FrigateMqttRouter({
+            cameraMap: frigate.cameraMap, topicPrefix: frigate.topicPrefix,
+            motionMode: frigate.motionMode, motionLabels: frigate.motionLabels
+        });
         const runtime = new FrigateMqttRuntime({
             connect: (options) => connect(frigate.url, options),
             connectionOptions, router, dispatcher: coordinator.dispatcher
