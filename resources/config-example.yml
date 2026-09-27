@@ -24,6 +24,22 @@ analytics:
     # username: "mqtt-user"
     # password: "mqtt-password"
 
+  recorders:
+    - name: "lorex"
+      enabled: false
+      host_source: cam1
+      source: "lorex"
+      protocol: "http"
+      # Default path shown explicitly for clarity.
+      path: "/cgi-bin/eventManager.cgi?action=attach&codes=[All]&heartbeat=5"
+      reconnect_period_ms: 5000
+      connect_timeout_ms: 10000
+      inactivity_timeout_ms: 20000
+      tls_reject_unauthorized: true
+      channel_map:
+        "0": "VirtualCam1"
+        "1": "VirtualCam2"
+
 host_sources:
   - name: cam1
     hostname: 192.168.1.50

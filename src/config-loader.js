@@ -201,11 +201,11 @@ function loadConfig(configPath) {
         return camera;
     });
 
-    const analytics = normalizeAnalyticsConfig(config.analytics, seenCameraNames);
+    const analytics = normalizeAnalyticsConfig(config.analytics, seenCameraNames, sourcesByName);
     return { runtime, cameras, analytics };
 }
 
-function normalizeAnalyticsConfig(value, cameraNames) {
+function normalizeAnalyticsConfig(value, cameraNames, sourcesByName) {
     const analytics = value || {};
     if (typeof analytics !== "object" || Array.isArray(analytics)) {
         throw new Error("analytics must be an object.");
@@ -275,6 +275,126 @@ function normalizeAnalyticsConfig(value, cameraNames) {
         throw new Error("analytics.frigate.topic_prefix must not be empty.");
     }
 
+    const recordersInput = analytics.recorders || [];
+    if (!Array.isArray(recordersInput)) {
+        throw new Error("analytics.recorders must be an array.");
+    }
+
+    const recorderNames = new Set();
+    const recorders = recordersInput.map((recorder, index) => {
+        const label = "analytics.recorders[" + index + "]";
+        if (!recorder || typeof recorder !== "object" || Array.isArray(recorder)) {
+            throw new Error(label + " must be an object.");
+        }
+
+        const name = normalizeOptionalString(recorder.name, label + ".name");
+        if (!name) {
+            throw new Error(label + ".name is required.");
+        }
+        if (recorderNames.has(name)) {
+            throw new Error("Duplicate recorder analytics name '" + name + "'.");
+        }
+        recorderNames.add(name);
+
+        if (recorder.enabled !== undefined && typeof recorder.enabled !== "boolean") {
+            throw new Error(label + ".enabled must be true or false.");
+        }
+        const recorderEnabled = recorder.enabled !== false;
+
+        const hostSourceName = normalizeOptionalString(
+            recorder.host_source,
+            label + ".host_source"
+        );
+        if (!hostSourceName || !sourcesByName[hostSourceName]) {
+            throw new Error(
+                label + ".host_source references unknown host_source '" +
+                (hostSourceName || "") + "'."
+            );
+        }
+        const hostSource = sourcesByName[hostSourceName];
+
+        const protocol = (
+            normalizeOptionalString(recorder.protocol, label + ".protocol") || "http"
+        ).toLowerCase();
+        if (!["http", "https"].includes(protocol)) {
+            throw new Error(label + ".protocol must be 'http' or 'https'.");
+        }
+
+        const eventPath = normalizeOptionalString(
+            recorder.path,
+            label + ".path"
+        ) || "/cgi-bin/eventManager.cgi?action=attach&codes=[All]&heartbeat=5";
+        if (!eventPath.startsWith("/")) {
+            throw new Error(label + ".path must begin with '/'.");
+        }
+
+        const channelMapInput = recorder.channel_map || {};
+        if (
+            typeof channelMapInput !== "object" ||
+            Array.isArray(channelMapInput)
+        ) {
+            throw new Error(label + ".channel_map must be an object.");
+        }
+
+        const channelMap = {};
+        for (const [channelValue, virtualCamera] of Object.entries(channelMapInput)) {
+            const channel = Number(channelValue);
+            if (!Number.isInteger(channel) || channel < 0) {
+                throw new Error(label + ".channel_map keys must be non-negative integers.");
+            }
+
+            const target = normalizeOptionalString(
+                virtualCamera,
+                label + ".channel_map value"
+            );
+            if (!cameraNames.has(target)) {
+                throw new Error(
+                    label + ".channel_map references unknown virtual camera '" + target + "'."
+                );
+            }
+            channelMap[String(channel)] = target;
+        }
+
+        if (recorderEnabled && Object.keys(channelMap).length === 0) {
+            throw new Error(
+                label + ".channel_map must contain at least one mapping when enabled."
+            );
+        }
+
+        let rejectUnauthorized = recorder.tls_reject_unauthorized;
+        if (rejectUnauthorized === undefined) rejectUnauthorized = true;
+        if (typeof rejectUnauthorized !== "boolean") {
+            throw new Error(label + ".tls_reject_unauthorized must be true or false.");
+        }
+
+        const baseUrl = protocol + "://" + hostSource.hostname + ":" + hostSource.http_port;
+        const url = new URL(eventPath, baseUrl).toString();
+
+        return Object.freeze({
+            name,
+            enabled: recorderEnabled,
+            source: normalizeOptionalString(recorder.source, label + ".source") || name,
+            host_source: hostSourceName,
+            url,
+            username: hostSource.auth?.username || null,
+            password: hostSource.auth?.password || null,
+            reconnect_period_ms: normalizeNonNegativeInteger(
+                recorder.reconnect_period_ms ?? 5000,
+                label + ".reconnect_period_ms"
+            ),
+            connect_timeout_ms: normalizePositiveInteger(
+                recorder.connect_timeout_ms ?? 10000,
+                label + ".connect_timeout_ms"
+            ),
+            inactivity_timeout_ms: normalizeNonNegativeInteger(
+                recorder.inactivity_timeout_ms ?? 20000,
+                label + ".inactivity_timeout_ms"
+            ),
+            tls_reject_unauthorized: rejectUnauthorized,
+            channel_map: Object.freeze(channelMap)
+        });
+    });
+
     return {
         frigate: Object.freeze({
             enabled,
@@ -296,7 +416,8 @@ function normalizeAnalyticsConfig(value, cameraNames) {
                 "analytics.frigate.keepalive_seconds"
             ),
             camera_map: Object.freeze(cameraMap)
-        })
+        }),
+        recorders: Object.freeze(recorders)
     };
 }
 

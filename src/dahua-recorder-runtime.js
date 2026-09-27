@@ -49,8 +49,18 @@ class DahuaRecorderRuntime extends EventEmitter {
         this.emit("state", this.health());
     }
 
+    connect() {
+        this.parser.reset();
+        this.setState("connected");
+    }
+
+    disconnect() {
+        this.parser.reset();
+        if (this.state !== "stopped") this.setState("disconnected");
+    }
+
     push(chunk) {
-        if (this.state === "stopped") this.setState("connected");
+        if (this.state !== "connected") this.setState("connected");
         try { this.parser.push(chunk); }
         catch (error) { this.errors += 1; this.emit("runtimeError", error); }
     }
@@ -72,7 +82,7 @@ class DahuaRecorderRuntime extends EventEmitter {
     }
 
     stop() {
-        this.parser.flush();
+        this.parser.reset();
         this.setState("stopped");
     }
 
