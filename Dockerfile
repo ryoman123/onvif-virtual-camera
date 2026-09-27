@@ -30,4 +30,7 @@ CMD ["node", "main.js"]
 # -------------------------
 FROM base AS prod
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD ["node", "tools/container-healthcheck.js"]
+
 CMD ["node", "main.js"]
