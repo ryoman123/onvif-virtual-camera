@@ -54,6 +54,37 @@ runtime:
 
 The default is deliberately `audit`: valid credentials continue to work while missing/stale timestamps and nonce replays are surfaced. Switch to `enforce` only after verifying the ONVIF client behavior you actually use.
 
+### Frigate Analytics Events
+
+Frigate detections can be translated into ONVIF PullPoint events and delivered through the same virtual camera that Protect has adopted. The bridge includes its own MQTT 3.1.1 client, so no extra MQTT package or sidecar is required.
+
+```yaml
+analytics:
+  frigate:
+    enabled: true
+    broker: "mqtt://192.168.1.20:1883"
+    topic_prefix: "frigate"
+    client_id: "onvif-vcam"
+    reconnect_period_ms: 5000
+    connect_timeout_ms: 30000
+    keepalive_seconds: 30
+    camera_map:
+      driveway: "VirtualCam1"
+      back_yard: "VirtualCam2"
+    # username: "mqtt-user"
+    # password: "mqtt-password"
+```
+
+- `broker`: MQTT broker URL using `mqtt://` or `mqtts://`. Put credentials in the dedicated fields rather than embedding them in the URL.
+- `camera_map`: Maps Frigate camera names to configured virtual camera names. Unknown targets are rejected during startup.
+- `topic_prefix`: Defaults to `frigate` and subscribes to availability, tracked-object events, and per-camera motion topics.
+- `client_id`: MQTT client identity. Use a unique value if multiple bridge instances share one broker.
+- `reconnect_period_ms`: Delay before reconnecting after a broker disconnect. Set to `0` to disable automatic reconnect.
+- `connect_timeout_ms`: Connection timeout for the MQTT broker.
+- `keepalive_seconds`: MQTT keepalive interval. Set to `0` to disable MQTT keepalive pings.
+
+Person, vehicle, animal, package, and motion state is normalized before publication. Overlapping detections are aggregated so one source cannot clear an ONVIF state while another contributor remains active.
+
 ### Host Sources
 
 Each host source element describes the `real` camera or recorder endpoint:
