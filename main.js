@@ -5,10 +5,12 @@ const configLoader = require("./src/config-loader");
 const CameraManager = require("./src/camera-manager");
 const DiscoveryManager = require("./src/discovery-manager");
 const { stopCameraManagers } = require("./src/shutdown-manager");
+const { AnalyticsRuntimeManager } = require("./src/analytics-runtime-manager");
 
 async function start() {
     const startupSummaries = [];
     const managers = [];
+    let analyticsManager = null;
     let shuttingDown = false;
 
     logger.info("Starting ONVIF Virtual Camera Server...");
@@ -19,7 +21,17 @@ async function start() {
         }
 
         shuttingDown = true;
-        logger.info(`Graceful shutdown requested (${reason}); stopping ${managers.length} virtual camera(s)...`);
+        logger.info(`Graceful shutdown requested (${reason}); stopping analytics and ${managers.length} virtual camera(s)...`);
+
+        if (analyticsManager) {
+            try {
+                await analyticsManager.stop();
+            } catch (error) {
+                logger.error(`Failed to stop analytics runtime: ${error.message}`);
+                if (exitCode === 0) exitCode = 1;
+            }
+            analyticsManager = null;
+        }
 
         const errors = await stopCameraManagers(managers, reason);
         if (errors.length > 0 && exitCode === 0) {
@@ -73,6 +85,18 @@ async function start() {
             await shutdown(`startup failure: ${cam.name}`, 1);
             return;
         }
+    }
+
+    try {
+        analyticsManager = new AnalyticsRuntimeManager({
+            config: config.analytics,
+            cameraManagers: managers
+        });
+        analyticsManager.start();
+    } catch (err) {
+        logger.error(`Failed to initialize analytics runtime: ${err.message}`);
+        await shutdown("analytics startup failure", 1);
+        return;
     }
 
     logger.info(`Initialization complete. ${startupSummaries.length} virtual camera(s) running.`);
