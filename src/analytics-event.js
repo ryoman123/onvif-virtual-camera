@@ -19,15 +19,28 @@ function normalizeAnalyticsEvent(input) {
     if (confidence !== null && (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)) {
         throw new Error("analytics event.confidence must be between 0 and 1");
     }
+    const timestamp = input.utcTime == null ? new Date() : new Date(input.utcTime);
+    if (!Number.isFinite(timestamp.getTime())) throw new Error("analytics event.utcTime must be a valid date");
+    let box = null;
+    if (input.box != null) {
+        if (!Array.isArray(input.box) || input.box.length !== 4) {
+            throw new Error("analytics event.box must contain four coordinates");
+        }
+        box = input.box.map(Number);
+        if (box.some((coordinate) => !Number.isFinite(coordinate))) {
+            throw new Error("analytics event.box coordinates must be finite numbers");
+        }
+        box = Object.freeze(box);
+    }
     return Object.freeze({
         source: String(input.source || "unknown"),
         camera,
         type,
         active,
-        utcTime: new Date(input.utcTime || Date.now()).toISOString(),
+        utcTime: timestamp.toISOString(),
         confidence,
         objectId: input.objectId == null ? null : String(input.objectId),
-        box: Array.isArray(input.box) ? Object.freeze([...input.box]) : null,
+        box,
         zones: Object.freeze(Array.isArray(input.zones) ? [...input.zones].map(String) : [])
     });
 }
