@@ -28,3 +28,15 @@ test("preserves recorder Start/Stop lifecycle as ONVIF boolean state",()=>{
  const messages=bus.pull(sub.id,10).messages; assert.deepEqual(messages.map(x=>x.data.IsMotion),[true,false]);
  runtime.stop(); assert.equal(runtime.health().state,"stopped");
 });
+
+test("pulse alarms clear their ONVIF property state after a short interval", async()=>{
+ const bus=new EventBus({topics:DEFAULT_TOPICS}); const dispatcher=new AnalyticsDispatcher();
+ dispatcher.registerTarget("VirtualCam6",{eventBus:bus,videoSourceConfigToken:"source-6"});
+ const router=new DahuaAnalyticsRouter({source:"lorex",channelMap:{5:"VirtualCam6"}});
+ const runtime=new DahuaRecorderRuntime({router,dispatcher,pulseDurationMs:15});
+ const sub=bus.createSubscription({ttlMs:60000});
+ runtime.push("Code=CrossLineDetection;action=Pulse;index=5;data={\"Object\":{\"ObjectType\":\"Human\"}}\r\n");
+ await new Promise(resolve=>setTimeout(resolve,35));
+ assert.deepEqual(bus.pull(sub.id,10).messages.map(x=>x.data.State),[true,false]);
+ runtime.stop();
+});

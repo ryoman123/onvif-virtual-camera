@@ -40,6 +40,11 @@ class DahuaRecorderRuntime extends EventEmitter {
         this.droppedEvents = 0;
         this.errors = 0;
         this.lastEventAt = null;
+        this.pulseDurationMs = options.pulseDurationMs ?? 1000;
+        if (!Number.isInteger(this.pulseDurationMs) || this.pulseDurationMs <= 0) {
+            throw new Error("Dahua pulse duration must be a positive integer");
+        }
+        this.pulseTimers = new Map();
         this.parser = new DahuaEventStreamParser((event) => this.handleEvent(event));
     }
 
@@ -61,9 +66,25 @@ class DahuaRecorderRuntime extends EventEmitter {
         try {
             const event = this.router.route(input);
             if (!event) { this.droppedEvents += 1; return; }
+            const key = `${event.camera}|${event.type}`;
+            const existing = this.pulseTimers.get(key);
+            if (existing) { clearTimeout(existing); this.pulseTimers.delete(key); }
             const published = this.dispatcher.dispatch(event);
             if (published) this.eventsDispatched += 1;
             else this.droppedEvents += 1;
+            if (input.action === "pulse") {
+                const timer = setTimeout(() => {
+                    this.pulseTimers.delete(key);
+                    try {
+                        if (this.dispatcher.dispatch({ ...event, active: false })) this.eventsDispatched += 1;
+                    } catch (error) {
+                        this.errors += 1;
+                        this.emit("runtimeError", error);
+                    }
+                }, this.pulseDurationMs);
+                timer.unref?.();
+                this.pulseTimers.set(key, timer);
+            }
         } catch (error) {
             this.droppedEvents += 1;
             this.errors += 1;
@@ -73,6 +94,8 @@ class DahuaRecorderRuntime extends EventEmitter {
 
     stop() {
         this.parser.flush();
+        for (const timer of this.pulseTimers.values()) clearTimeout(timer);
+        this.pulseTimers.clear();
         this.setState("stopped");
     }
 
