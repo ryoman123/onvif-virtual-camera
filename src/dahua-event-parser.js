@@ -56,6 +56,10 @@ class DahuaEventStreamParser {
         }
     }
 
+    reset() {
+        this.buffer = "";
+    }
+
     flush() {
         const event = parseDahuaEventLine(this.buffer);
         this.buffer = "";
