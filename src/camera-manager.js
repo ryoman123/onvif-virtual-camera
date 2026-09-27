@@ -18,6 +18,18 @@ class CameraManager {
         this.stopping = false;
     }
 
+    getAnalyticsTarget() {
+        const server = this.server;
+        if (!server) {
+            return null;
+        }
+
+        return {
+            eventBus: server.eventBus,
+            videoSourceConfigToken: server.mediaService?.videoSourceConfigTokenHq
+        };
+    }
+
     buildStartupSummary() {
         const lifecycle = this.camera?.lifecycle || {};
 
