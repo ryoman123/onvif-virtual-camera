@@ -2,6 +2,7 @@ const fs = require("fs");
 const { spawnSync } = require("child_process");
 const yaml = require("js-yaml");
 const logger = require("./log-manager");
+const { toFrigateCameraName } = require("./frigate-naming");
 
 function hasAuth(object) {
     return !!(
@@ -248,21 +249,47 @@ function normalizeAnalyticsConfig(value, cameraNames, sourcesByName) {
         throw new Error("analytics.frigate.username and password must be provided together.");
     }
 
-    const mapInput = input.camera_map || {};
-    if (typeof mapInput !== "object" || Array.isArray(mapInput)) {
-        throw new Error("analytics.frigate.camera_map must be an object.");
-    }
-
+    const mapInput = input.camera_map ?? {};
     const cameraMap = {};
-    for (const [frigateCamera, virtualCamera] of Object.entries(mapInput)) {
-        const source = normalizeOptionalString(frigateCamera, "analytics.frigate.camera_map key");
-        const target = normalizeOptionalString(virtualCamera, "analytics.frigate.camera_map value");
-        if (!cameraNames.has(target)) {
+
+    if (mapInput === "auto") {
+        const generated = new Map();
+        for (const target of cameraNames) {
+            const source = toFrigateCameraName(target);
+            const collision = generated.get(source);
+            if (collision) {
+                throw new Error(
+                    "analytics.frigate.camera_map auto naming collision: '" +
+                    collision + "' and '" + target + "' both become '" + source + "'."
+                );
+            }
+            generated.set(source, target);
+            cameraMap[source] = target;
+        }
+    } else {
+        if (typeof mapInput !== "object" || Array.isArray(mapInput)) {
             throw new Error(
-                "analytics.frigate.camera_map references unknown virtual camera '" + target + "'."
+                "analytics.frigate.camera_map must be an object or the string 'auto'."
             );
         }
-        cameraMap[source] = target;
+
+        for (const [frigateCamera, virtualCamera] of Object.entries(mapInput)) {
+            const source = normalizeOptionalString(
+                frigateCamera,
+                "analytics.frigate.camera_map key"
+            );
+            const target = normalizeOptionalString(
+                virtualCamera,
+                "analytics.frigate.camera_map value"
+            );
+            if (!cameraNames.has(target)) {
+                throw new Error(
+                    "analytics.frigate.camera_map references unknown virtual camera '" +
+                    target + "'."
+                );
+            }
+            cameraMap[source] = target;
+        }
     }
 
     if (enabled && Object.keys(cameraMap).length === 0) {
