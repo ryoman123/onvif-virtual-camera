@@ -369,6 +369,7 @@ function buildEventServiceCapabilities(maxPullPoints = 32) {
     return {
         $attributes: {
             WSSubscriptionPolicySupport: false,
+            WSPullPointSupport: true,
             WSPausableSubscriptionManagerInterfaceSupport: false,
             MaxNotificationProducers: 1,
             MaxPullPoints: maxPullPoints,

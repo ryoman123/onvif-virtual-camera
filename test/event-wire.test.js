@@ -279,6 +279,7 @@ test("Event SOAP wire exposes service capabilities and topic properties", async 
 
         assert.equal(capsResponse.status, 200);
         assert.match(capsBody, /GetServiceCapabilitiesResponse/);
+        assert.match(capsBody, /WSPullPointSupport="true"/);
         assert.match(capsBody, /MaxPullPoints="32"/);
         assert.match(capsBody, /PersistentNotificationStorage="false"/);
 
