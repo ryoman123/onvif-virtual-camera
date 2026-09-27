@@ -254,12 +254,13 @@ still publishes its own standard ONVIF analytics topic for other consumers.
 The default `motion_mode: raw` preserves the previous behavior.
 
 Protect's current third-party camera support documents motion detection but
-does not support importing third-party object classifications as native Protect
-smart detections. Frigate person/vehicle events therefore appear in Protect as
-motion if Protect accepts this virtual camera's PullPoint events. Confirm with
-a real event on one camera before enabling all 29. For Protect's own person or
-vehicle smart-detection timeline on a third-party camera, Ubiquiti documents
-the AI Port as the supported route.
+does not document importing third-party object classifications as native Protect
+smart detections. Frigate person/vehicle events can therefore be offered both as
+standard ONVIF analytics events and as selected motion events. Confirm with a
+real event on one camera before enabling all 29. Whether Protect renders the
+standard object topics as native person/vehicle smart detections remains an
+experimental interoperability question; this project does not require UniFi AI
+hardware for Frigate inference.
 
 ## Optional Lorex/Dahua recorder analytics
 
