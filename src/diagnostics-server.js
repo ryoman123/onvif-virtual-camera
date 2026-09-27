@@ -1,3 +1,4 @@
+const logger = require("./log-manager");
 const http = require("http");
 
 function cameraHealthy(camera) {
@@ -96,7 +97,7 @@ class DiagnosticsServer {
             server.listen(this.port, this.host, () => {
                 server.removeListener("error", onError);
                 server.on("error", (error) => {
-                    this.emitFatal?.(error);
+                    logger.error("Diagnostics server error: " + error.message);
                 });
                 resolve();
             });
