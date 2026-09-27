@@ -68,15 +68,13 @@ analytics:
     reconnect_period_ms: 5000
     connect_timeout_ms: 30000
     keepalive_seconds: 30
-    camera_map:
-      driveway: "VirtualCam1"
-      back_yard: "VirtualCam2"
+    camera_map: auto
     # username: "mqtt-user"
     # password: "mqtt-password"
 ```
 
 - `broker`: MQTT broker URL using `mqtt://` or `mqtts://`. Put credentials in the dedicated fields rather than embedding them in the URL.
-- `camera_map`: Maps Frigate camera names to configured virtual camera names. Unknown targets are rejected during startup.
+- `camera_map`: Maps Frigate camera names to configured virtual camera names. Set it to `auto` to derive stable lowercase/underscore names from every virtual camera, or provide an explicit mapping object. Unknown targets and automatic naming collisions are rejected during startup.
 - `topic_prefix`: Defaults to `frigate` and subscribes to availability, tracked-object events, and per-camera motion topics.
 - `client_id`: MQTT client identity. Use a unique value if multiple bridge instances share one broker.
 - `reconnect_period_ms`: Delay before reconnecting after a broker disconnect. Set to `0` to disable automatic reconnect.
@@ -84,6 +82,35 @@ analytics:
 - `keepalive_seconds`: MQTT keepalive interval. Set to `0` to disable MQTT keepalive pings.
 
 Person, vehicle, animal, package, and motion state is normalized before publication. Overlapping detections are aggregated so one source cannot clear an ONVIF state while another contributor remains active.
+
+### Frigate AI Sidecar Deployment
+
+The repository can generate a Frigate deployment directly from the bridge camera inventory. The generated deployment is intentionally an **AI sidecar**: it uses each virtual camera's configured LQ source for object detection, publishes detections over MQTT, and leaves recording to UniFi Protect.
+
+```bash
+npm run frigate:generate -- \
+  --input ./config.yml \
+  --output-dir ./frigate-sidecar
+```
+
+The output contains:
+
+- `config/config.yml`: Frigate configuration with one detect-only camera for every virtual camera.
+- `.env`: MQTT and RTSP credentials, written separately from the Frigate YAML with file mode `0600`.
+- `docker-compose.yml`: A deployable Frigate `stable` container using the authenticated UI on port `8971` and WebRTC on `8555`. The unauthenticated API port `5000` and host RTSP port `8554` are deliberately not published.
+- `bridge-frigate-map.yml`: The exact generated Frigate-to-virtual-camera mapping for auditing or explicit configuration.
+
+The generator creates deterministic Frigate camera names from the bridge names and caps detection at 5 FPS by default. It reuses the LQ stream resolution when one is declared in `stream_lq`, and routes Frigate's ffmpeg process through its internal go2rtc restream so the AI pipeline maintains one source connection per detect stream.
+
+To change the detection ceiling:
+
+```bash
+npm run frigate:generate -- --input ./config.yml --detect-fps 7 --force
+```
+
+For `mqtts://` brokers, the generator enables MQTT TLS and defaults to the container's system CA bundle. A custom CA path inside the Frigate container can be supplied with `--mqtt-ca-certs`.
+
+The sidecar does not hard-code an object detector backend or video hardware-acceleration preset because those depend on the host hardware. Configure the available accelerator in Frigate after the generated deployment is running. The generated object list matches the bridge's built-in event adapter: person, common vehicles, dog, cat, and bird.
 
 ### Native Dahua/Lorex Recorder Events
 
