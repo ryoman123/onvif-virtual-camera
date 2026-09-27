@@ -4,6 +4,48 @@ const EVENT_TYPE_MAP = Object.freeze({
     SmartMotionVehicle: "vehicle"
 });
 
+const IVS_EVENT_CODES = new Set([
+    "CrossLineDetection",
+    "CrossRegionDetection",
+    "LeftDetection",
+    "TakenAwayDetection",
+    "ParkingDetection",
+    "WanderDetection",
+    "RioterDetection",
+    "FaceDetection"
+]);
+
+const OBJECT_TYPE_MAP = Object.freeze({
+    human: "person",
+    person: "person",
+    pedestrian: "person",
+    vehicle: "vehicle",
+    motorvehicle: "vehicle",
+    car: "vehicle",
+    truck: "vehicle",
+    bus: "vehicle",
+    motorcycle: "vehicle",
+    bicycle: "vehicle",
+    animal: "animal"
+});
+
+function normalizeObjectType(value) {
+    return String(value || "").replace(/[^A-Za-z]/g, "").toLowerCase();
+}
+
+function findObjectType(data) {
+    if (!data || typeof data !== "object") return null;
+    const candidates = [
+        data.Object?.ObjectType, data.Object?.Type, data.object?.objectType, data.object?.type,
+        data.ObjectType, data.objectType, data.Type, data.type
+    ];
+    for (const candidate of candidates) {
+        const mapped = OBJECT_TYPE_MAP[normalizeObjectType(candidate)];
+        if (mapped) return mapped;
+    }
+    return null;
+}
+
 function parseDahuaEventLine(line) {
     const text = String(line || "").trim();
     if (!text.startsWith("Code=")) return null;
@@ -15,9 +57,6 @@ function parseDahuaEventLine(line) {
         fields[part.slice(0, index)] = part.slice(index + 1);
     }
 
-    const type = EVENT_TYPE_MAP[fields.Code];
-    if (!type) return null;
-
     const action = String(fields.action || "").toLowerCase();
     if (!["start", "stop", "pulse"].includes(action)) return null;
 
@@ -28,6 +67,9 @@ function parseDahuaEventLine(line) {
     if (fields.data) {
         try { data = JSON.parse(fields.data); } catch { data = null; }
     }
+
+    const type = EVENT_TYPE_MAP[fields.Code] || (IVS_EVENT_CODES.has(fields.Code) ? (findObjectType(data) || "motion") : null);
+    if (!type) return null;
 
     return Object.freeze({
         source: "dahua",
@@ -63,4 +105,4 @@ class DahuaEventStreamParser {
     }
 }
 
-module.exports = { EVENT_TYPE_MAP, parseDahuaEventLine, DahuaEventStreamParser };
+module.exports = { EVENT_TYPE_MAP, IVS_EVENT_CODES, OBJECT_TYPE_MAP, parseDahuaEventLine, DahuaEventStreamParser };
