@@ -78,6 +78,34 @@ curl -s http://127.0.0.1:9090/status
 
 Binding diagnostics to a non-loopback address makes the unauthenticated status endpoint reachable from other hosts. Keep the default loopback bind unless external monitoring specifically requires otherwise and the network path is appropriately restricted.
 
+### Field Acceptance and Soak Test
+
+The acceptance checker turns the detailed status endpoint into a repeatable deployment gate. It verifies the exact camera count, unique identities, every lifecycle stage, live IP/interface bindings, analytics-target coverage, and connected enabled analytics runtimes.
+
+For the 29-camera deployment with Frigate and both recorders:
+
+```bash
+npm run acceptance:check -- \
+  --expected-cameras 29 \
+  --require-frigate \
+  --require-recorder lorex \
+  --require-recorder nvr69
+```
+
+Run the same assertions continuously for a soak period:
+
+```bash
+npm run acceptance:check -- \
+  --expected-cameras 29 \
+  --require-frigate \
+  --require-recorder lorex \
+  --require-recorder nvr69 \
+  --soak-seconds 43200 \
+  --interval-seconds 30
+```
+
+The command prints a machine-readable JSON result and exits non-zero on the first failed sample. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, the real recorder mappings, observed event delivery, restart/reconnect exercises, and a completed soak.
+
 ### Frigate Analytics Events
 
 Frigate detections can be translated into ONVIF PullPoint events and delivered through the same virtual camera that Protect has adopted. The bridge includes its own MQTT 3.1.1 client, so no extra MQTT package or sidecar is required.

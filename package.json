@@ -12,7 +12,8 @@
   "scripts": {
     "start": "node main.js",
     "test": "node --test",
-    "frigate:generate": "node tools/generate-frigate-config.js"
+    "frigate:generate": "node tools/generate-frigate-config.js",
+    "acceptance:check": "node tools/acceptance-check.js"
   },
   "dependencies": {
     "js-yaml": "^4.1.1",
