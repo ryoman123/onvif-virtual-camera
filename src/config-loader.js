@@ -201,7 +201,103 @@ function loadConfig(configPath) {
         return camera;
     });
 
-    return { runtime, cameras };
+    const analytics = normalizeAnalyticsConfig(config.analytics, seenCameraNames);
+    return { runtime, cameras, analytics };
+}
+
+function normalizeAnalyticsConfig(value, cameraNames) {
+    const analytics = value || {};
+    if (typeof analytics !== "object" || Array.isArray(analytics)) {
+        throw new Error("analytics must be an object.");
+    }
+
+    const input = analytics.frigate || {};
+    if (typeof input !== "object" || Array.isArray(input)) {
+        throw new Error("analytics.frigate must be an object.");
+    }
+
+    const enabled = input.enabled === true;
+    if (input.enabled !== undefined && typeof input.enabled !== "boolean") {
+        throw new Error("analytics.frigate.enabled must be true or false.");
+    }
+
+    let broker = null;
+    if (input.broker !== undefined && input.broker !== null) {
+        broker = normalizeOptionalString(input.broker, "analytics.frigate.broker");
+        let parsed;
+        try {
+            parsed = new URL(broker);
+        } catch (error) {
+            throw new Error("analytics.frigate.broker must be a valid mqtt:// or mqtts:// URL.");
+        }
+        if (!["mqtt:", "mqtts:"].includes(parsed.protocol)) {
+            throw new Error("analytics.frigate.broker must use mqtt:// or mqtts://.");
+        }
+        if (parsed.username || parsed.password) {
+            throw new Error("analytics.frigate credentials must use username/password fields, not URL credentials.");
+        }
+    }
+
+    if (enabled && !broker) {
+        throw new Error("analytics.frigate.broker is required when Frigate analytics is enabled.");
+    }
+
+    const username = normalizeOptionalString(input.username, "analytics.frigate.username");
+    const password = normalizeOptionalString(input.password, "analytics.frigate.password");
+    if ((username && !password) || (!username && password)) {
+        throw new Error("analytics.frigate.username and password must be provided together.");
+    }
+
+    const mapInput = input.camera_map || {};
+    if (typeof mapInput !== "object" || Array.isArray(mapInput)) {
+        throw new Error("analytics.frigate.camera_map must be an object.");
+    }
+
+    const cameraMap = {};
+    for (const [frigateCamera, virtualCamera] of Object.entries(mapInput)) {
+        const source = normalizeOptionalString(frigateCamera, "analytics.frigate.camera_map key");
+        const target = normalizeOptionalString(virtualCamera, "analytics.frigate.camera_map value");
+        if (!cameraNames.has(target)) {
+            throw new Error(
+                "analytics.frigate.camera_map references unknown virtual camera '" + target + "'."
+            );
+        }
+        cameraMap[source] = target;
+    }
+
+    if (enabled && Object.keys(cameraMap).length === 0) {
+        throw new Error("analytics.frigate.camera_map must contain at least one mapping when enabled.");
+    }
+
+    const topicPrefix = normalizeOptionalString(input.topic_prefix, "analytics.frigate.topic_prefix") || "frigate";
+    const normalizedTopicPrefix = topicPrefix.replace(/^\/+|\/+$/g, "");
+    if (!normalizedTopicPrefix) {
+        throw new Error("analytics.frigate.topic_prefix must not be empty.");
+    }
+
+    return {
+        frigate: Object.freeze({
+            enabled,
+            broker,
+            username: username || null,
+            password: password || null,
+            topic_prefix: normalizedTopicPrefix,
+            client_id: normalizeOptionalString(input.client_id, "analytics.frigate.client_id") || "onvif-vcam",
+            reconnect_period_ms: normalizeNonNegativeInteger(
+                input.reconnect_period_ms ?? 5000,
+                "analytics.frigate.reconnect_period_ms"
+            ),
+            connect_timeout_ms: normalizePositiveInteger(
+                input.connect_timeout_ms ?? 30000,
+                "analytics.frigate.connect_timeout_ms"
+            ),
+            keepalive_seconds: normalizeNonNegativeInteger(
+                input.keepalive_seconds ?? 30,
+                "analytics.frigate.keepalive_seconds"
+            ),
+            camera_map: Object.freeze(cameraMap)
+        })
+    };
 }
 
 function resolveStreamDetails(cam, runtime, streamKind) {
