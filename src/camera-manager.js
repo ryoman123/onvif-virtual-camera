@@ -16,6 +16,44 @@ class CameraManager {
         this.monitorTimer = null;
         this.restarting = false;
         this.stopping = false;
+        this.startedAt = null;
+        this.restartCount = 0;
+        this.lastNetworkChangeAt = null;
+    }
+
+    health() {
+        const serverHealth = this.server?.health() || null;
+        const lifecycle = serverHealth?.lifecycle
+            || Object.freeze({ ...(this.camera?.lifecycle || {}) });
+
+        let state = "stopped";
+        if (this.stopping) state = "stopping";
+        else if (this.restarting) state = "restarting";
+        else if (this.server && this.camera) state = "running";
+
+        return Object.freeze({
+            name: this.cameraConfig.name,
+            state,
+            startedAt: this.startedAt,
+            restartCount: this.restartCount,
+            lastNetworkChangeAt: this.lastNetworkChangeAt,
+            interface: this.camera?.interface || null,
+            ip: this.camera?.ip || null,
+            sourceHost: this.cameraConfig.host?.hostname || null,
+            lifecycle,
+            rtsp: serverHealth?.rtsp || Object.freeze({
+                ready: false,
+                activeSessions: 0
+            }),
+            events: serverHealth?.events || Object.freeze({
+                topics: 0,
+                subscriptions: 0,
+                retained: 0,
+                queued: 0,
+                waiters: 0,
+                sequence: 0
+            })
+        });
     }
 
     getAnalyticsTarget() {
@@ -177,6 +215,8 @@ class CameraManager {
             this.camera = this.createCameraRuntime(network);
             this.server = new OnvifServer(this.camera, this.discoveryManager);
             await this.server.start();
+            this.restartCount += 1;
+            this.lastNetworkChangeAt = new Date().toISOString();
 
             logger.info(`Camera ${this.camera.name} rebound to ${this.camera.interface} with IP ${this.camera.ip}`);
         } catch (err) {
@@ -265,6 +305,7 @@ class CameraManager {
 
         this.server = new OnvifServer(camera, this.discoveryManager);
         await this.server.start();
+        this.startedAt = new Date().toISOString();
         this.startMonitoring();
 
         logger.info(`ONVIF server started for ${camera.name} at ${camera.endpoints.deviceServiceUrl}`);
