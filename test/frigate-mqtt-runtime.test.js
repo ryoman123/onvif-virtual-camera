@@ -51,6 +51,25 @@ function fixture() {
     return { client, bus, router, runtime };
 }
 
+test("MQTT runtime can retry after a synchronous connection failure", async () => {
+    const { router } = fixture();
+    const dispatcher = new AnalyticsDispatcher();
+    const client = new FakeMqttClient();
+    let attempts = 0;
+    const runtime = new FrigateMqttRuntime({
+        router,
+        dispatcher,
+        connect() {
+            if (++attempts === 1) throw new Error("broker unavailable");
+            return client;
+        }
+    });
+    assert.throws(() => runtime.start(), /broker unavailable/);
+    assert.equal(runtime.health().state, "stopped");
+    assert.equal(runtime.start(), client);
+    await runtime.stop();
+});
+
 test("MQTT runtime subscribes on connect and tracks lifecycle health", async () => {
     const { client, router, runtime } = fixture();
 
