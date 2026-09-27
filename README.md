@@ -85,6 +85,37 @@ analytics:
 
 Person, vehicle, animal, package, and motion state is normalized before publication. Overlapping detections are aggregated so one source cannot clear an ONVIF state while another contributor remains active.
 
+### Native Dahua/Lorex Recorder Events
+
+Dahua-compatible recorders, including many Lorex NVRs, can feed their native motion and smart-motion events directly into the same ONVIF PullPoint pipeline. The bridge maintains the recorder event stream itself, handles HTTP Digest authentication, and reconnects automatically.
+
+```yaml
+analytics:
+  recorders:
+    - name: "lorex"
+      enabled: true
+      host_source: cam1
+      source: "lorex"
+      protocol: "http"
+      path: "/cgi-bin/eventManager.cgi?action=attach&codes=[All]&heartbeat=5"
+      reconnect_period_ms: 5000
+      connect_timeout_ms: 10000
+      inactivity_timeout_ms: 20000
+      tls_reject_unauthorized: true
+      channel_map:
+        "0": "VirtualCam1"
+        "1": "VirtualCam2"
+```
+
+- `host_source`: Reuses the recorder address, HTTP port, and credentials already defined under `host_sources`; recorder passwords do not need to be duplicated.
+- `channel_map`: Maps the recorder's event `index` to a virtual camera. Dahua/Lorex event indices are zero-based, so recorder index `0` normally corresponds to the first channel.
+- `path`: Defaults to the event-manager attach endpoint with `codes=[All]` and a 5-second heartbeat.
+- `protocol`: Uses `http` by default and may be set to `https`.
+- `inactivity_timeout_ms`: Reconnects if the long-lived stream stops delivering data. The 20-second default allows several missed 5-second heartbeats before recovery.
+- `tls_reject_unauthorized`: Defaults to `true`. Set it to `false` only when a local HTTPS recorder uses a certificate that the container cannot validate.
+
+The native parser currently translates `VideoMotion`, `SmartMotionHuman`, and `SmartMotionVehicle` into ONVIF motion, person, and vehicle property events. Native recorder events and Frigate detections may be enabled together; the dispatcher aggregates overlapping contributors before changing the ONVIF state.
+
 ### Host Sources
 
 Each host source element describes the `real` camera or recorder endpoint:
