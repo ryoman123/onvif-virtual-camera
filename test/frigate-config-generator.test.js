@@ -14,7 +14,7 @@ function bridgeConfig() {
                 enabled: true,
                 broker: "mqtt://192.0.2.20:1883",
                 username: "mqtt-user",
-                password: "mqtt-secret",
+                password: "mqtt-$secret",
                 topic_prefix: "frigate"
             }
         },
@@ -76,9 +76,13 @@ test("Frigate sidecar generator produces AI-only LQ camera inventory without YAM
     assert.equal(bundle.bridgeCameraMap.driveway_2, "Driveway 2");
 
     assert.equal(bundle.frigateYaml.includes("camera-secret"), false);
-    assert.equal(bundle.frigateYaml.includes("mqtt-secret"), false);
+    assert.equal(bundle.frigateYaml.includes("mqtt-$secret"), false);
     assert.equal(bundle.envText.includes("camera-secret"), true);
-    assert.equal(bundle.envText.includes("mqtt-secret"), true);
+    assert.equal(bundle.envText.includes("mqtt-$secret"), true);
+    assert.equal(
+        bundle.envText.includes("FRIGATE_MQTT_PASSWORD='mqtt-$secret'"),
+        true
+    );
     assert.equal(
         bundle.env.FRIGATE_CAMERA_FRONT_DOOR_DETECT_URL.includes("subtype=1"),
         true
