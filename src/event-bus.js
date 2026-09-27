@@ -329,6 +329,26 @@ class EventBus {
         return queued;
     }
 
+    health() {
+        this.pruneExpired();
+
+        let queued = 0;
+        let waiters = 0;
+        for (const subscription of this.subscriptions.values()) {
+            queued += subscription.queue.length;
+            if (subscription.waiter) waiters += 1;
+        }
+
+        return Object.freeze({
+            topics: this.topicRegistry.size,
+            subscriptions: this.subscriptions.size,
+            retained: this.retained.size,
+            queued,
+            waiters,
+            sequence: this.sequence
+        });
+    }
+
     pruneExpired() {
         const nowMs = this.now();
 
