@@ -108,7 +108,7 @@ analytics:
     assert.equal(recorder.name, "lorex");
     assert.equal(recorder.enabled, true);
     assert.equal(recorder.source, "lorex");
-    assert.equal(recorder.url.startsWith("http://192.0.2.10:80/cgi-bin/eventManager.cgi"), true);
+    assert.equal(recorder.url.startsWith("http://192.0.2.10/cgi-bin/eventManager.cgi"), true);
     assert.equal(recorder.channel_map["0"], "VirtualCam1");
     assert.equal(recorder.inactivity_timeout_ms, 20000);
 });
