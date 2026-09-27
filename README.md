@@ -221,6 +221,26 @@ On a successful startup, expect to see:
 
 If startup fails, the logs should point to the relevant stage, such as config validation, interface lookup, bind failure, or source probing.
 
+### Deployment preflight
+
+Before replacing a working deployment, validate the exact configuration and its
+environment without starting listeners or changing network interfaces:
+
+```bash
+sudo docker run --rm --network host \
+  --env-file ./analytics.env \
+  -v ./config.yml:/config.yml:ro \
+  ghcr.io/ryoman123/onvif-virtual-camera:grand-design \
+  npm run preflight -- --config /config.yml --expected-cameras 29 --require-analytics-coverage
+```
+
+The command exits non-zero if configuration loading fails, the camera count is
+not exactly the expected value, a required analytics environment variable is
+missing, or any virtual camera lacks a Frigate/recorder mapping. Its JSON output
+contains identity and mapping counts plus missing environment-variable names;
+it never prints credential values. Omit `--require-analytics-coverage` when a
+deployment intentionally has cameras without analytics.
+
 ## Adding Cameras to UniFi Protect
 
 1. Open UniFi Protect and navigate to Devices.

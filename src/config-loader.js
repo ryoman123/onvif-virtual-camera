@@ -59,6 +59,13 @@ function normalizeRtspPath(path, label) {
         : `/${trimmed}`;
 }
 
+function redactUrlCredentials(value) {
+    return String(value || "").replace(
+        /\b([a-z][a-z0-9+.-]*:\/\/)[^@\s/]+@/gi,
+        "$1[redacted]@"
+    );
+}
+
 function loadConfig(configPath) {
     if (!fs.existsSync(configPath)) {
         throw new Error(`Config file not found at ${configPath}`);
@@ -345,7 +352,7 @@ function fetchStreamDetails(cam, runtime, streamKind) {
     const rtspUrl = streamKind === "lq" ? cam.rtspUrlLq : cam.rtspUrlHq;
     logger.debug('config', `Using ffprobe path: ${ffprobePath}`);
 
-    logger.debug('config', `Calling ffprobe for '${cam.name}' ${streamLabel} stream with URL: ${rtspUrl}`);
+    logger.debug('config', `Calling ffprobe for '${cam.name}' ${streamLabel} stream with URL: ${redactUrlCredentials(rtspUrl)}`);
     const result = spawnSync(
         ffprobePath,
         [
@@ -370,7 +377,7 @@ function fetchStreamDetails(cam, runtime, streamKind) {
     if (result.status !== 0) {
         logger.warn(
             `ffprobe returned non-zero for '${cam.name}' ${streamLabel} stream: ` +
-            `${(result.stderr || "").trim() || `exit ${result.status}`}; using defaults`
+            `${redactUrlCredentials((result.stderr || "").trim()) || `exit ${result.status}`}; using defaults`
         );
         return defaults;
     }
@@ -633,4 +640,4 @@ function normalizeOptionalString(value, label) {
     return trimmed;
 }
 
-module.exports = { loadConfig };
+module.exports = { loadConfig, redactUrlCredentials };
