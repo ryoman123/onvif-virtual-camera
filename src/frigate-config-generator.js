@@ -53,11 +53,14 @@ function buildRtspUrl(source, path) {
 }
 
 function dotenvValue(value) {
-    return '"' + String(value)
+    const text = String(value);
+    if (/[\r\n]/.test(text)) {
+        throw new Error("Generated environment values must not contain newlines");
+    }
+
+    return "'" + text
         .replace(/\\/g, "\\\\")
-        .replace(/"/g, '\\"')
-        .replace(/\r/g, "\\r")
-        .replace(/\n/g, "\\n") + '"';
+        .replace(/'/g, "\\'") + "'";
 }
 
 function parseMqtt(config, options = {}) {
@@ -128,8 +131,8 @@ function generateFrigateBundle(config, options = {}) {
     const mqtt = parseMqtt(config, options);
     const trackedObjects = options.trackedObjects || DEFAULT_TRACKED_OBJECTS;
     const detectFps = Number(options.detectFps ?? 5);
-    if (!Number.isFinite(detectFps) || detectFps <= 0) {
-        throw new Error("detectFps must be a positive number");
+    if (!Number.isInteger(detectFps) || detectFps <= 0) {
+        throw new Error("detectFps must be a positive integer");
     }
 
     const frigateConfig = {
