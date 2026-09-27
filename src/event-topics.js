@@ -15,6 +15,10 @@ const TOPIC_DEFINITIONS = Object.freeze([
             Object.freeze({
                 name: "VideoSourceConfigurationToken",
                 type: "tt:ReferenceToken"
+            }),
+            Object.freeze({
+                name: "RuleName",
+                type: "xs:string"
             })
         ]),
         data: Object.freeze([

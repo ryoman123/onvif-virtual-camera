@@ -207,6 +207,14 @@ async function checkSubscriptionRoundTrip(startServer) {
         const dynamicPath = addressMatch[1];
 
         bus.publish({
+            topic: TOPICS.MOTION,
+            utcTime: "2026-09-26T19:59:59.000Z",
+            data: {
+                IsMotion: true
+            }
+        });
+
+        bus.publish({
             topic: TOPICS.PERSON,
             utcTime: "2026-09-26T20:00:00.000Z",
             data: {
@@ -241,6 +249,9 @@ async function checkSubscriptionRoundTrip(startServer) {
             pullBody,
             /video_source_config_hq_test/
         );
+        assert.match(pullBody, /tns1:RuleEngine\/CellMotionDetector\/Motion/);
+        assert.match(pullBody, /Name="RuleName" Value="MotionDetector"/);
+        assert.match(pullBody, /Name="IsMotion" Value="true"/);
         assert.match(pullBody, /Name="State"/);
         assert.match(pullBody, /Value="true"/);
     } finally {
@@ -282,6 +293,7 @@ test("Event SOAP wire exposes service capabilities and topic properties", async 
         assert.equal(propsResponse.status, 200);
         assert.match(propsBody, /GetEventPropertiesResponse/);
         assert.match(propsBody, /CellMotionDetector/);
+        assert.match(propsBody, /SimpleItemDescription Name="RuleName" Type="xs:string"/);
         assert.match(propsBody, /HumanShapeDetect/);
         assert.match(propsBody, /VehicleDetect/);
     } finally {
