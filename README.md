@@ -34,12 +34,25 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  ws_security:
+    mode: audit
+    max_age_seconds: 300
+    future_skew_seconds: 300
+    nonce_cache_size: 2048
+    allow_password_text: true
 ```
 
 - `enable_debug_logs`: Uses `false`, `true`, or an array of debug categories (auth, config, device, discovery, http, lifecycle, media, network, snapshot).
 - `probe_streams`: Probe source streams with `ffprobe` when a camera does not define `stream_hq` and `stream_lq` blocks.
 - `probe_timeout_ms`: Timeout for RTSP stream probing.
 - `ip_monitor_interval_ms`: Interval used to check for IP address changes due to DHCP.
+- `ws_security.mode`: `audit` preserves compatible authentication while logging freshness/replay findings; `enforce` rejects UsernameTokens that violate the configured replay policy.
+- `ws_security.max_age_seconds`: Maximum age of a UsernameToken `Created` timestamp.
+- `ws_security.future_skew_seconds`: Allowed client clock lead before a `Created` timestamp is considered invalid.
+- `ws_security.nonce_cache_size`: Maximum number of recently accepted nonces retained per virtual camera.
+- `ws_security.allow_password_text`: Keeps PasswordText compatibility available. Disable only after confirming every client uses PasswordDigest.
+
+The default is deliberately `audit`: valid credentials continue to work while missing/stale timestamps and nonce replays are surfaced. Switch to `enforce` only after verifying the ONVIF client behavior you actually use.
 
 ### Host Sources
 

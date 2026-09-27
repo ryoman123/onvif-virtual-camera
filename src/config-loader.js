@@ -16,7 +16,14 @@ function getDefaultRuntime() {
         enable_debug_logs: false,
         probe_streams: true,
         probe_timeout_ms: 15000,
-        ip_monitor_interval_ms: 5000
+        ip_monitor_interval_ms: 5000,
+        ws_security: {
+            mode: "audit",
+            max_age_seconds: 300,
+            future_skew_seconds: 300,
+            nonce_cache_size: 2048,
+            allow_password_text: true
+        }
     };
 }
 
@@ -82,11 +89,17 @@ function loadConfig(configPath) {
     }
 
     // Set runtime values
+    const defaultRuntime = getDefaultRuntime();
     const runtime = {
-        ...getDefaultRuntime(),
-        ...(config.runtime || {})
+        ...defaultRuntime,
+        ...(config.runtime || {}),
+        ws_security: {
+            ...defaultRuntime.ws_security,
+            ...((config.runtime && config.runtime.ws_security) || {})
+        }
     };
     validateRuntimeSettings(runtime);
+    runtime.ws_security = Object.freeze({ ...runtime.ws_security });
     global.runtime = Object.freeze(runtime);
 
     // Build host source lookup map
@@ -354,6 +367,22 @@ function validateRuntimeSettings(runtime) {
 
     normalizePositiveInteger(runtime.probe_timeout_ms, "runtime.probe_timeout_ms");
     normalizePositiveInteger(runtime.ip_monitor_interval_ms, "runtime.ip_monitor_interval_ms");
+
+    if (!runtime.ws_security || typeof runtime.ws_security !== "object" || Array.isArray(runtime.ws_security)) {
+        throw new Error("runtime.ws_security must be an object.");
+    }
+
+    if (!["audit", "enforce"].includes(runtime.ws_security.mode)) {
+        throw new Error("runtime.ws_security.mode must be 'audit' or 'enforce'.");
+    }
+
+    normalizePositiveInteger(runtime.ws_security.max_age_seconds, "runtime.ws_security.max_age_seconds");
+    normalizeNonNegativeInteger(runtime.ws_security.future_skew_seconds, "runtime.ws_security.future_skew_seconds");
+    normalizePositiveInteger(runtime.ws_security.nonce_cache_size, "runtime.ws_security.nonce_cache_size");
+
+    if (typeof runtime.ws_security.allow_password_text !== "boolean") {
+        throw new Error("runtime.ws_security.allow_password_text must be true or false.");
+    }
 }
 
 function normalizeIpAssignment(value, label) {
@@ -454,6 +483,19 @@ function normalizePositiveInteger(value, label) {
     const parsed = Number(value);
     if (!Number.isInteger(parsed) || parsed <= 0) {
         throw new Error(`${label} must be a positive integer.`);
+    }
+
+    return parsed;
+}
+
+function normalizeNonNegativeInteger(value, label) {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    const parsed = Number(value);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+        throw new Error(`${label} must be a non-negative integer.`);
     }
 
     return parsed;

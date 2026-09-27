@@ -3,6 +3,12 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  ws_security:
+    mode: audit
+    max_age_seconds: 300
+    future_skew_seconds: 300
+    nonce_cache_size: 2048
+    allow_password_text: true
 
 host_sources:
   - name: cam1

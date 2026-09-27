@@ -9,6 +9,56 @@
         <xs:restriction base="xs:string"/>
     </xs:simpleType>
 
+    <xs:simpleType name="StreamType">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="RTP-Unicast"/>
+            <xs:enumeration value="RTP-Multicast"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:simpleType name="TransportProtocol">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="UDP"/>
+            <xs:enumeration value="TCP"/>
+            <xs:enumeration value="RTSP"/>
+            <xs:enumeration value="HTTP"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="Transport">
+        <xs:sequence>
+            <xs:element name="Protocol" type="tt:TransportProtocol"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="StreamSetup">
+        <xs:sequence>
+            <xs:element name="Stream" type="tt:StreamType"/>
+            <xs:element name="Transport" type="tt:Transport"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="ScopeDefinition">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Fixed"/>
+            <xs:enumeration value="Configurable"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <xs:complexType name="Scope">
+        <xs:sequence>
+            <xs:element name="ScopeDef" type="tt:ScopeDefinition"/>
+            <xs:element name="ScopeItem" type="xs:anyURI"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:simpleType name="DiscoveryMode">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="Discoverable"/>
+            <xs:enumeration value="NonDiscoverable"/>
+        </xs:restriction>
+    </xs:simpleType>
+
     <xs:complexType name="Time">
         <xs:sequence>
             <xs:element name="Hour" type="xs:int"/>
@@ -171,10 +221,20 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="EventsCapabilities">
+        <xs:sequence>
+            <xs:element name="XAddr" type="xs:string" minOccurs="0"/>
+            <xs:element name="WSSubscriptionPolicySupport" type="xs:boolean" minOccurs="0"/>
+            <xs:element name="WSPullPointSupport" type="xs:boolean" minOccurs="0"/>
+            <xs:element name="WSPausableSubscriptionManagerInterfaceSupport" type="xs:boolean" minOccurs="0"/>
+        </xs:sequence>
+    </xs:complexType>
+
     <xs:complexType name="Capabilities">
         <xs:sequence>
             <xs:element name="Device" type="tt:DeviceCapabilities" minOccurs="0"/>
             <xs:element name="Media" type="tt:MediaCapabilities" minOccurs="0"/>
+            <xs:element name="Events" type="tt:EventsCapabilities" minOccurs="0"/>
         </xs:sequence>
     </xs:complexType>
 
@@ -187,6 +247,18 @@
         </xs:sequence>
     </xs:complexType>
 
+    <xs:complexType name="IntRange">
+        <xs:sequence>
+            <xs:element name="Min" type="xs:int"/>
+            <xs:element name="Max" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <xs:complexType name="VideoEncoderConfigurationOptions">
+        <xs:sequence>
+            <xs:element name="QualityRange" type="tt:IntRange"/>
+        </xs:sequence>
+    </xs:complexType>
     <xs:complexType name="Resolution">
         <xs:sequence>
             <xs:element name="Width" type="xs:int"/>

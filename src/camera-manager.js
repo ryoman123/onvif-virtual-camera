@@ -15,6 +15,7 @@ class CameraManager {
         this.server = null;
         this.monitorTimer = null;
         this.restarting = false;
+        this.stopping = false;
     }
 
     buildStartupSummary() {
@@ -29,6 +30,7 @@ class CameraManager {
             ip: this.camera?.ip || null,
             deviceServiceUrl: this.camera?.endpoints?.deviceServiceUrl || null,
             mediaServiceUrl: this.camera?.endpoints?.mediaServiceUrl || null,
+            eventServiceUrl: this.camera?.endpoints?.eventServiceUrl || null,
             rtspUriHq: this.camera?.endpoints?.rtspUriHq || null,
             rtspUriLq: this.camera?.endpoints?.rtspUriLq || null,
             snapshotUri: this.camera?.endpoints?.snapshotUri || null,
@@ -36,6 +38,7 @@ class CameraManager {
                 configLoaded: !!lifecycle.configLoaded,
                 networkResolved: !!lifecycle.networkResolved,
                 httpReady: !!lifecycle.httpReady,
+                eventReady: !!lifecycle.eventReady,
                 snapshotReady: !!lifecycle.snapshotReady,
                 rtspProxyReady: !!lifecycle.rtspProxyReady,
                 discoveryReady: !!lifecycle.discoveryReady
@@ -56,6 +59,7 @@ class CameraManager {
             endpoints: {
                 deviceServiceUrl: `http://${network.ip}:${onvifPort}/onvif/device_service`,
                 mediaServiceUrl: `http://${network.ip}:${onvifPort}/onvif/media_service`,
+                eventServiceUrl: `http://${network.ip}:${onvifPort}/onvif/event_service`,
                 rtspUriHq: `rtsp://${network.ip}:${rtspProxyPort}${this.cameraConfig.rtspPathHq}`,
                 rtspUriLq: `rtsp://${network.ip}:${rtspProxyPort}${this.cameraConfig.rtspPathLq}`,
                 snapshotUri: `http://${network.ip}:${onvifPort}${this.cameraConfig.snapshotPath}`
@@ -75,6 +79,7 @@ class CameraManager {
                 networkResolved: true,
                 rtspProxyReady: false,
                 httpReady: false,
+                eventReady: false,
                 snapshotReady: false,
                 discoveryReady: false
             }
@@ -138,7 +143,7 @@ class CameraManager {
     }
 
     async handleNetworkChange(network) {
-        if (this.restarting) {
+        if (this.restarting || this.stopping) {
             return;
         }
 
@@ -185,7 +190,7 @@ class CameraManager {
         const intervalMs = global.runtime?.ip_monitor_interval_ms || 15000;
 
         this.monitorTimer = setInterval(async () => {
-            if (!this.camera || this.restarting) {
+            if (!this.camera || this.restarting || this.stopping) {
                 return;
             }
 
@@ -217,7 +222,30 @@ class CameraManager {
         logger.info(`Started IP monitoring for ${this.cameraConfig.name} (interval=${intervalMs}ms)`);
     }
 
+    async stop() {
+        if (this.stopping) {
+            return;
+        }
+
+        this.stopping = true;
+
+        if (this.monitorTimer) {
+            clearInterval(this.monitorTimer);
+            this.monitorTimer = null;
+        }
+
+        const server = this.server;
+        this.server = null;
+
+        if (server) {
+            await server.stop();
+        }
+
+        logger.info(`Stopped virtual camera: ${this.cameraConfig.name}`);
+    }
+
     async start() {
+        this.stopping = false;
         logger.info(`Initializing virtual camera: ${this.cameraConfig.name}`);
 
         const camera = await this.resolveRuntimeWithDhcpRetry();

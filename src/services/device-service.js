@@ -1,4 +1,13 @@
 const logger = require("../log-manager");
+const { getFixedScopeObjects } = require("../onvif-scopes");
+const {
+    buildDeviceServiceCapabilities,
+    buildMediaServiceCapabilities,
+    buildEventServiceCapabilities,
+    renderDeviceServiceCapabilitiesXml,
+    renderMediaServiceCapabilitiesXml,
+    renderEventServiceCapabilitiesXml
+} = require("../service-capabilities");
 
 class DeviceService {
     constructor(camera) {
@@ -9,6 +18,8 @@ class DeviceService {
         return {
             XAddr: this.camera.endpoints.deviceServiceUrl,
             System: {
+                DiscoveryResolve: true,
+                DiscoveryBye: true,
                 SupportedVersions: {
                     Major: 2,
                     Minor: 5
@@ -48,6 +59,19 @@ class DeviceService {
         };
     }
 
+    buildEventsCapabilities() {
+        return {
+            XAddr: this.camera.endpoints.eventServiceUrl,
+            WSSubscriptionPolicySupport: false,
+            WSPullPointSupport: true,
+            WSPausableSubscriptionManagerInterfaceSupport: false
+        };
+    }
+
+    buildDeviceServiceCapabilities() {
+        return buildDeviceServiceCapabilities();
+    }
+
     // ONVIF: GetDeviceInformation
     async GetDeviceInformation() {
         logger.debug("device",
@@ -71,39 +95,65 @@ class DeviceService {
     // ONVIF: GetSystemDateAndTime
     async GetSystemDateAndTime() {
         const now = new Date();
+        const utcDateTime = {
+            Time: {
+                Hour: now.getUTCHours(),
+                Minute: now.getUTCMinutes(),
+                Second: now.getUTCSeconds()
+            },
+            Date: {
+                Year: now.getUTCFullYear(),
+                Month: now.getUTCMonth() + 1,
+                Day: now.getUTCDate()
+            }
+        };
 
         return {
             SystemDateAndTime: {
-                DateTimeType: "NTP",
+                DateTimeType: "Manual",
                 DaylightSavings: false,
                 TimeZone: {
                     TZ: "UTC"
                 },
-                UTCDateTime: {
-                    Time: {
-                        Hour: now.getUTCHours(),
-                        Minute: now.getUTCMinutes(),
-                        Second: now.getUTCSeconds()
-                    },
-                    Date: {
-                        Year: now.getUTCFullYear(),
-                        Month: now.getUTCMonth() + 1,
-                        Day: now.getUTCDate()
-                    }
-                },
+                UTCDateTime: utcDateTime,
                 LocalDateTime: {
-                    Time: {
-                        Hour: now.getHours(),
-                        Minute: now.getMinutes(),
-                        Second: now.getSeconds()
-                    },
-                    Date: {
-                        Year: now.getFullYear(),
-                        Month: now.getMonth() + 1,
-                        Day: now.getDate()
-                    }
+                    Time: { ...utcDateTime.Time },
+                    Date: { ...utcDateTime.Date }
                 }
             }
+        };
+    }
+
+    // ONVIF: GetScopes
+    async GetScopes() {
+        const scopes = getFixedScopeObjects(this.camera);
+
+        logger.debug("device",
+            `GetScopes called for ${this.camera.name} -> ${scopes.map((scope) => scope.ScopeItem).join(", ")}`
+        );
+
+        return {
+            Scopes: scopes
+        };
+    }
+
+    // ONVIF: GetDiscoveryMode
+    async GetDiscoveryMode() {
+        logger.debug("device", `GetDiscoveryMode called for ${this.camera.name} -> Discoverable`);
+
+        return {
+            DiscoveryMode: "Discoverable"
+        };
+    }
+
+    // ONVIF: GetServiceCapabilities
+    async GetServiceCapabilities() {
+        const capabilities = this.buildDeviceServiceCapabilities();
+
+        logger.debug("device", `GetServiceCapabilities called for ${this.camera.name}`);
+
+        return {
+            Capabilities: capabilities
         };
     }
 
@@ -119,6 +169,7 @@ class DeviceService {
         const allRequested = requested.length === 0 || requested.includes("All");
         const includeDevice = allRequested || requested.includes("Device");
         const includeMedia = allRequested || requested.includes("Media");
+        const includeEvents = allRequested || requested.includes("Events");
 
         const capabilities = {};
 
@@ -130,15 +181,20 @@ class DeviceService {
             capabilities.Media = this.buildMediaCapabilities();
         }
 
+        if (includeEvents) {
+            capabilities.Events = this.buildEventsCapabilities();
+        }
+
         logger.debug('device', 
             `GetCapabilities called for ${this.camera.name} ` +
             `(Category=${JSON.stringify(category)})`
         );
         logger.debug("device",
             `GetCapabilities response for ${this.camera.name}: ` +
-            `includeDevice=${includeDevice}, includeMedia=${includeMedia}, ` +
+            `includeDevice=${includeDevice}, includeMedia=${includeMedia}, includeEvents=${includeEvents}, ` +
             `deviceXAddr=${capabilities.Device && capabilities.Device.XAddr}, ` +
-            `mediaXAddr=${capabilities.Media && capabilities.Media.XAddr}`
+            `mediaXAddr=${capabilities.Media && capabilities.Media.XAddr}, ` +
+            `eventXAddr=${capabilities.Events && capabilities.Events.XAddr}`
         );
 
         return {
@@ -166,12 +222,31 @@ class DeviceService {
                     Major: 2,
                     Minor: 5
                 }
+            },
+            {
+                Namespace: "http://www.onvif.org/ver10/events/wsdl",
+                XAddr: this.camera.endpoints.eventServiceUrl,
+                Version: {
+                    Major: 2,
+                    Minor: 5
+                }
             }
         ];
 
         if (includeCapability) {
-            services[0].Capabilities = this.buildDeviceCapabilities();
-            services[1].Capabilities = this.buildMediaCapabilities();
+            const deviceCapabilities = buildDeviceServiceCapabilities();
+            const mediaCapabilities = buildMediaServiceCapabilities();
+            const eventCapabilities = buildEventServiceCapabilities();
+
+            services[0].Capabilities = {
+                $xml: renderDeviceServiceCapabilitiesXml(deviceCapabilities)
+            };
+            services[1].Capabilities = {
+                $xml: renderMediaServiceCapabilitiesXml(mediaCapabilities)
+            };
+            services[2].Capabilities = {
+                $xml: renderEventServiceCapabilitiesXml(eventCapabilities)
+            };
         }
 
         logger.debug('device',`GetServices called for ${this.camera.name} ` + `(IncludeCapability=${includeCapability})`);
@@ -191,6 +266,9 @@ class DeviceService {
         return {
             GetDeviceInformation: this.GetDeviceInformation.bind(this),
             GetSystemDateAndTime: this.GetSystemDateAndTime.bind(this),
+            GetScopes: this.GetScopes.bind(this),
+            GetDiscoveryMode: this.GetDiscoveryMode.bind(this),
+            GetServiceCapabilities: this.GetServiceCapabilities.bind(this),
             GetCapabilities: this.GetCapabilities.bind(this),
             GetServices: this.GetServices.bind(this)
         };
