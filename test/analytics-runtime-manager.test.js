@@ -72,7 +72,7 @@ test("runtime manager wires Frigate MQTT detections into a live camera event bus
         const messages = eventBus.pull(subscription.id, 10).messages;
         assert.equal(messages.length, 1);
         assert.equal(messages[0].topic, TOPICS.PERSON);
-        assert.equal(messages[0].data.IsMotion, true);
+        assert.equal(messages[0].data.State, true);
         assert.equal(runtime.health().frigate.eventsDispatched, 1);
     } finally {
         await runtime.stop();
