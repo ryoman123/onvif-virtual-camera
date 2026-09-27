@@ -134,6 +134,10 @@ function generateFrigateBundle(config, options = {}) {
     if (!Number.isInteger(detectFps) || detectFps <= 0) {
         throw new Error("detectFps must be a positive integer");
     }
+    const openvinoThreads = Number(options.openvinoThreads ?? 3);
+    if (!Number.isInteger(openvinoThreads) || openvinoThreads <= 0) {
+        throw new Error("openvinoThreads must be a positive integer");
+    }
 
     const frigateConfig = {
         mqtt: {
@@ -149,7 +153,7 @@ function generateFrigateBundle(config, options = {}) {
             ov: {
                 type: "openvino",
                 device: "CPU",
-                num_threads: Number(options.openvinoThreads ?? 3)
+                num_threads: openvinoThreads
             }
         },
         model: {

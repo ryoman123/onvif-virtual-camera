@@ -64,14 +64,23 @@ test("Frigate sidecar generator produces AI-only LQ camera inventory without YAM
     assert.equal(front.friendly_name, "Front Door");
     assert.equal(front.detect.width, 960);
     assert.equal(front.detect.height, 480);
-    assert.equal(front.detect.fps, 5);
+    assert.equal(front.detect.fps, 3);
     assert.equal(front.ffmpeg.inputs[0].roles[0], "detect");
     assert.equal(
         front.ffmpeg.inputs[0].path,
         "rtsp://127.0.0.1:8554/front_door"
     );
 
-    assert.equal(bundle.frigateConfig.cameras.driveway_2.detect.fps, 4);
+    assert.equal(bundle.frigateConfig.cameras.driveway_2.detect.fps, 3);
+    assert.deepEqual(bundle.frigateConfig.detectors.ov, {
+        type: "openvino",
+        device: "CPU",
+        num_threads: 3
+    });
+    assert.equal(
+        bundle.frigateConfig.model.path,
+        "/openvino-model/ssdlite_mobilenet_v2.xml"
+    );
     assert.equal(bundle.bridgeCameraMap.front_door, "Front Door");
     assert.equal(bundle.bridgeCameraMap.driveway_2, "Driveway 2");
 
@@ -90,6 +99,20 @@ test("Frigate sidecar generator produces AI-only LQ camera inventory without YAM
     assert.equal(
         bundle.env.FRIGATE_CAMERA_FRONT_DOOR_DETECT_URL.includes("subtype=0"),
         false
+    );
+});
+
+test("Frigate OpenVINO CPU tuning is validated and configurable", () => {
+    const bundle = generateFrigateBundle(bridgeConfig(), {
+        detectFps: 2,
+        openvinoThreads: 4
+    });
+
+    assert.equal(bundle.frigateConfig.detectors.ov.num_threads, 4);
+    assert.equal(bundle.frigateConfig.cameras.front_door.detect.fps, 2);
+    assert.throws(
+        () => generateFrigateBundle(bridgeConfig(), { openvinoThreads: 0 }),
+        /openvinoThreads must be a positive integer/
     );
 });
 

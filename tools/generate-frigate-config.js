@@ -47,7 +47,7 @@ function usage() {
         "Options:",
         "  --input PATH          Bridge config.yml (default: ./config.yml)",
         "  --output-dir PATH     Output directory (default: ./frigate-sidecar)",
-        "  --detect-fps NUMBER   Maximum detection FPS per camera (default: 5)",
+        "  --detect-fps NUMBER   Maximum detection FPS per camera (default: 3)",
         "  --openvino-threads N   OpenVINO CPU threads (default: 3)",
         "  --mqtt-ca-certs PATH  CA bundle path inside Frigate for mqtts://",
         "  --force               Replace generated files if they already exist",
