@@ -19,8 +19,8 @@ analytics:
     reconnect_period_ms: 5000
     connect_timeout_ms: 30000
     keepalive_seconds: 30
-    camera_map:
-      driveway: "VirtualCam1"
+    # "auto" uses the same deterministic names as the sidecar generator.
+    camera_map: auto
     # username: "mqtt-user"
     # password: "mqtt-password"
 
