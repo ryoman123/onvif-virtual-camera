@@ -106,6 +106,9 @@ class FrigateMqttRuntime extends EventEmitter {
         if (topic === this.router.topicPrefix + "/available") {
             this.available = this.router.available;
         }
+        if (this.messagesReceived % 10 === 0) {
+            this.emit("traffic", this.health());
+        }
     }
 
     start() {

@@ -67,6 +67,16 @@ class AnalyticsRuntimeManager {
         this.frigateRuntime.on("runtimeError", (error) => {
             logger.warn("Frigate MQTT runtime error: " + error.message);
         });
+        this.frigateRuntime.on("subscribed", (topics) => {
+            logger.info("Frigate MQTT subscribed to: " + topics.join(", "));
+        });
+        this.frigateRuntime.on("traffic", (health) => {
+            logger.info(
+                "Frigate MQTT traffic messages=" + health.messagesReceived +
+                ", dispatched=" + health.eventsDispatched +
+                ", dropped=" + health.droppedMessages
+            );
+        });
         router.on("unmapped", (camera) => {
             logger.warn("Frigate event ignored for unmapped camera '" + camera + "'");
         });
