@@ -85,6 +85,14 @@ function parseMqtt(config, options = {}) {
         );
     }
 
+    const username = frigate.username || null;
+    const password = frigate.password || null;
+    if ((username && !password) || (!username && password)) {
+        throw new Error(
+            "analytics.frigate.username and password must be provided together"
+        );
+    }
+
     const secure = parsed.protocol === "mqtts:";
     const port = Number(parsed.port || (secure ? 8883 : 1883));
     return {
@@ -92,8 +100,8 @@ function parseMqtt(config, options = {}) {
         port,
         secure,
         topicPrefix: frigate.topic_prefix || "frigate",
-        username: frigate.username || null,
-        password: frigate.password || null,
+        username,
+        password,
         caCerts: options.mqttCaCerts || "/etc/ssl/certs/ca-certificates.crt"
     };
 }
