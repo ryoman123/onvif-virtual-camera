@@ -201,7 +201,44 @@ function loadConfig(configPath) {
         return camera;
     });
 
-    return { runtime, cameras };
+    return { runtime, cameras, analytics: normalizeAnalyticsConfig(config.analytics, cameras) };
+}
+
+function normalizeAnalyticsConfig(value, cameras) {
+    if (value == null) return { frigate: null };
+    if (typeof value !== "object" || Array.isArray(value)) throw new Error("analytics must be an object.");
+    if (value.frigate == null) return { frigate: null };
+    const frigate = value.frigate;
+    if (typeof frigate !== "object" || Array.isArray(frigate)) throw new Error("analytics.frigate must be an object.");
+    const url = frigate.url;
+    if (typeof url !== "string" || !/^(mqtt|mqtts):\/\/[^\s@/]+(?::\d+)?\/?$/.test(url)) {
+        throw new Error("analytics.frigate.url must be a broker mqtt:// or mqtts:// URL without credentials.");
+    }
+    const cameraMap = frigate.camera_map;
+    if (!cameraMap || typeof cameraMap !== "object" || Array.isArray(cameraMap) || !Object.keys(cameraMap).length) {
+        throw new Error("analytics.frigate.camera_map must map Frigate names to virtual cameras.");
+    }
+    const names = new Set(cameras.map((camera) => camera.name));
+    for (const [source, target] of Object.entries(cameraMap)) {
+        if (!source.trim() || typeof target !== "string" || !names.has(target)) {
+            throw new Error(`analytics.frigate.camera_map has invalid mapping for '${source}'.`);
+        }
+    }
+    for (const key of ["username_env", "password_env"]) {
+        if (frigate[key] != null && (typeof frigate[key] !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(frigate[key]))) {
+            throw new Error(`analytics.frigate.${key} must name an environment variable.`);
+        }
+    }
+    if (Boolean(frigate.username_env) !== Boolean(frigate.password_env)) {
+        throw new Error("analytics.frigate username_env and password_env must be set together.");
+    }
+    if (frigate.topic_prefix != null && (typeof frigate.topic_prefix !== "string" || !/^[A-Za-z0-9_-]+(?:\/[A-Za-z0-9_-]+)*$/.test(frigate.topic_prefix))) {
+        throw new Error("analytics.frigate.topic_prefix must be a valid MQTT topic prefix.");
+    }
+    return { frigate: {
+        url, cameraMap: { ...cameraMap }, topicPrefix: frigate.topic_prefix || "frigate",
+        usernameEnv: frigate.username_env || null, passwordEnv: frigate.password_env || null
+    } };
 }
 
 function resolveStreamDetails(cam, runtime, streamKind) {

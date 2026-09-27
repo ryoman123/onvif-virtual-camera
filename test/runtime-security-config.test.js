@@ -59,6 +59,13 @@ function loadYaml(yaml) {
     }
 }
 
+test("Frigate mapping validates configured virtual camera names", () => {
+    const valid = loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://192.0.2.20:1883\n    camera_map:\n      front: Camera-Test\n    username_env: MQTT_USER\n    password_env: MQTT_PASS\n`);
+    assert.deepEqual(valid.analytics.frigate.cameraMap, { front: "Camera-Test" });
+    assert.throws(() => loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://192.0.2.20:1883\n    camera_map:\n      front: Wrong-Camera\n`), /invalid mapping/);
+    assert.throws(() => loadYaml(baseConfig() + `\nanalytics:\n  frigate:\n    url: mqtt://user:password@broker\n    camera_map:\n      front: Camera-Test\n`), /without credentials/);
+});
+
 test("WS-Security defaults are audit-first and frozen", () => {
     const { runtime } = loadYaml(baseConfig());
 

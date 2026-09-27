@@ -10,6 +10,18 @@ runtime:
     nonce_cache_size: 2048
     allow_password_text: true
 
+# Optional Frigate analytics. Names on the left match Frigate camera names;
+# names on the right match virtual_cameras.name exactly.
+# Credentials belong in container environment variables, never this file.
+# analytics:
+#   frigate:
+#     url: mqtt://192.168.1.60:1883
+#     topic_prefix: frigate
+#     camera_map:
+#       front: VirtualCam1
+#     username_env: MQTT_USER
+#     password_env: MQTT_PASS
+
 host_sources:
   - name: cam1
     hostname: 192.168.1.50

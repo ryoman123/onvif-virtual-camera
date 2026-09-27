@@ -227,3 +227,20 @@ If startup fails, the logs should point to the relevant stage, such as config va
 2. Your virtual cameras should appear for adoption in the list; click the "Adopt" link.
 3. Enter the source credentials if the camera requires authentication.
 4. Repeat for each virtual camera identity you configured.
+# Optional Frigate MQTT analytics
+
+Set `analytics.frigate` in `config.yml` using the commented example in
+`resources/config-example.yml`. `camera_map` maps each Frigate camera name to an
+existing `virtual_cameras.name`. The bridge subscribes to Frigate availability,
+object events, and per-camera motion and publishes normalized ONVIF events to
+the corresponding virtual camera. Frigate analytics is disabled when this block
+is absent; video and ONVIF services continue if MQTT disconnects.
+
+For an authenticated broker, configure `username_env` and `password_env` with
+environment variable *names*, then supply those variables to the container at
+runtime. Never put broker credentials in the URL or commit them to Git. A
+missing required variable prevents the analytics adapter from starting while
+leaving camera services available. The MQTT client reconnects automatically.
+
+This integration still requires live Protect interoperability validation before
+smart detections can be claimed as visible in Protect.

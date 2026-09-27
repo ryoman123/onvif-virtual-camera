@@ -5,10 +5,34 @@ const configLoader = require("./src/config-loader");
 const CameraManager = require("./src/camera-manager");
 const DiscoveryManager = require("./src/discovery-manager");
 const { stopCameraManagers } = require("./src/shutdown-manager");
+const { AnalyticsCoordinator } = require("./src/analytics-coordinator");
+const { FrigateMqttRouter } = require("./src/frigate-mqtt-router");
+const { FrigateMqttRuntime } = require("./src/frigate-mqtt-runtime");
+
+function configureAnalytics(config, coordinator, env = process.env, connect = require("mqtt").connect) {
+    const frigate = config.analytics?.frigate;
+    if (!frigate) return;
+    const connectionOptions = {};
+    if (frigate.usernameEnv) {
+        const username = env[frigate.usernameEnv];
+        const password = env[frigate.passwordEnv];
+        if (!username || !password) throw new Error("Frigate MQTT credentials are missing from environment");
+        connectionOptions.username = username;
+        connectionOptions.password = password;
+    }
+    const router = new FrigateMqttRouter({ cameraMap: frigate.cameraMap, topicPrefix: frigate.topicPrefix });
+    const runtime = new FrigateMqttRuntime({
+        connect: (options) => connect(frigate.url, options),
+        connectionOptions, router, dispatcher: coordinator.dispatcher
+    });
+    runtime.on("runtimeError", (error) => logger.warn(`Frigate MQTT error: ${error.message}`));
+    coordinator.addRuntime("frigate", runtime);
+}
 
 async function start() {
     const startupSummaries = [];
     const managers = [];
+    const analytics = new AnalyticsCoordinator();
     let shuttingDown = false;
 
     logger.info("Starting ONVIF Virtual Camera Server...");
@@ -21,8 +45,10 @@ async function start() {
         shuttingDown = true;
         logger.info(`Graceful shutdown requested (${reason}); stopping ${managers.length} virtual camera(s)...`);
 
+        const analyticsErrors = await analytics.stop();
+        for (const failure of analyticsErrors) logger.warn(`Failed to stop ${failure.name}: ${failure.error.message}`);
         const errors = await stopCameraManagers(managers, reason);
-        if (errors.length > 0 && exitCode === 0) {
+        if (errors.length > 0 || analyticsErrors.length > 0) {
             exitCode = 1;
         }
 
@@ -75,10 +101,22 @@ async function start() {
         }
     }
 
+    analytics.registerCameraManagers(managers);
+    try {
+        configureAnalytics(config, analytics);
+        await analytics.start();
+    } catch (err) {
+        logger.warn(`Analytics startup failed; camera services remain available: ${err.message}`);
+    }
+
     logger.info(`Initialization complete. ${startupSummaries.length} virtual camera(s) running.`);
 }
 
-start().catch((err) => {
-    logger.error(`Fatal startup error: ${err.message}`);
-    process.exit(1);
-});
+if (require.main === module) {
+    start().catch((err) => {
+        logger.error(`Fatal startup error: ${err.message}`);
+        process.exit(1);
+    });
+}
+
+module.exports = { configureAnalytics, start };
