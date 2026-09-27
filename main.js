@@ -30,6 +30,15 @@ function configureAnalytics(config, coordinator, env = process.env, connect = re
             connect: (options) => connect(frigate.url, options),
             connectionOptions, router, dispatcher: coordinator.dispatcher
         });
+        runtime.on("state", (health) => {
+            logger.info(`Frigate MQTT state: ${health.state} (messages=${health.messagesReceived}, dispatched=${health.eventsDispatched}, errors=${health.errors})`);
+        });
+        runtime.on("subscribed", (topics) => {
+            logger.info(`Frigate MQTT subscribed to: ${topics.join(", ")}`);
+        });
+        runtime.on("traffic", (health) => {
+            logger.info(`Frigate MQTT traffic: messages=${health.messagesReceived}, dispatched=${health.eventsDispatched}, dropped=${health.droppedMessages}`);
+        });
         runtime.on("runtimeError", (error) => logger.warn(`Frigate MQTT error: ${error.message}`));
         coordinator.addRuntime("frigate", runtime);
     }

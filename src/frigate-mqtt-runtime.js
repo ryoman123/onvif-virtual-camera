@@ -106,6 +106,10 @@ class FrigateMqttRuntime extends EventEmitter {
             this.recordError(error);
         }
 
+        if (this.messagesReceived % 10 === 0) {
+            this.emit("traffic", this.health());
+        }
+
     }
 
     start() {
