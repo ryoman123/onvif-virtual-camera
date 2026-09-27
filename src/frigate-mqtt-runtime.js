@@ -101,13 +101,13 @@ class FrigateMqttRuntime extends EventEmitter {
         } catch (error) {
             this.droppedMessages += 1;
             this.recordError(error);
-        }
-
-        if (topic === this.router.topicPrefix + "/available") {
-            this.available = this.router.available;
-        }
-        if (this.messagesReceived % 10 === 0) {
-            this.emit("traffic", this.health());
+        } finally {
+            if (topic === this.router.topicPrefix + "/available") {
+                this.available = this.router.available;
+            }
+            if (this.messagesReceived % 10 === 0) {
+                this.emit("traffic", this.health());
+            }
         }
     }
 
@@ -117,7 +117,17 @@ class FrigateMqttRuntime extends EventEmitter {
         this.started = true;
         this.stopping = false;
         this.setState("connecting");
-        this.client = this.connect(this.connectionOptions);
+        try {
+            this.client = this.connect(this.connectionOptions);
+            if (!this.client || typeof this.client.on !== "function") {
+                throw new Error("Frigate MQTT connect must return an event client");
+            }
+        } catch (error) {
+            this.started = false;
+            this.client = null;
+            this.setState("stopped");
+            throw error;
+        }
 
         for (const [event, handler] of Object.entries(this.handlers)) {
             this.client.on(event, handler);

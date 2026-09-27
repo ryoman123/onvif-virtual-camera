@@ -125,3 +125,27 @@ test("MQTT runtime contains malformed and unmapped messages", () => {
     assert.equal(health.errors, 1);
     assert.equal(errors.length, 1);
 });
+
+test("traffic reports rejected messages even when no events are dispatched", () => {
+    const { runtime } = fixture();
+    const reports = [];
+    runtime.on("traffic", health => reports.push(health));
+    for (let i = 0; i < 10; i++) runtime.handleMessage("frigate/unknown/motion", "ON");
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0].messagesReceived, 10);
+    assert.equal(reports[0].droppedMessages, 10);
+    assert.equal(reports[0].eventsDispatched, 0);
+});
+
+test("synchronous connect failure permits a later retry", async () => {
+    const { runtime, client } = fixture();
+    let attempts = 0;
+    runtime.connect = () => {
+        if (++attempts === 1) throw new Error("connection failed");
+        return client;
+    };
+    assert.throws(() => runtime.start(), /connection failed/);
+    assert.equal(runtime.health().state, "stopped");
+    assert.equal(runtime.start(), client);
+    await runtime.stop();
+});
