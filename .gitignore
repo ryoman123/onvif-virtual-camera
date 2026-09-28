@@ -20,6 +20,7 @@ credentials/
 
 # Local diagnostic and generated files
 camera-identities*.json
+deployment-checkpoints/
 vcam-probe-results.json
 lorex-snapshot-config-backup-*.txt
 *.log

@@ -14,6 +14,7 @@
     "test": "node --test",
     "frigate:generate": "node tools/generate-frigate-config.js",
     "identity:capture": "node tools/capture-identity-manifest.js",
+    "deploy:transactional": "node tools/transactional-deploy.js",
     "acceptance:check": "node tools/acceptance-check.js"
   },
   "dependencies": {

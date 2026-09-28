@@ -144,6 +144,33 @@ The analytics event minimums prove that each configured source dispatched a real
 
 The command prints a machine-readable JSON result and exits non-zero on the first failed sample. A soak also pins the bridge process start time and requires monotonically increasing uptime, so a container/process restart cannot disappear between otherwise healthy samples. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
 
+### Transactional Deployment and Rollback
+
+The deployment helper defaults to a read-only dry run. It validates the current 29-camera identity inventory, the candidate config and environment-file paths, the running container, and the candidate image reference without stopping anything:
+
+```bash
+npm run deploy:transactional -- deploy \
+  --image ghcr.io/ryoman123/onvif-virtual-camera@sha256:CANDIDATE_DIGEST \
+  --config ./config.yml \
+  --env-file ./.env \
+  --expected-cameras 29 \
+  --require-frigate \
+  --require-recorder lorex \
+  --require-recorder nvr69
+```
+
+Repeat the exact command with `--apply` only after reviewing the JSON plan. The helper writes a private identity checkpoint, stops and renames the exact old container instead of deleting it, launches the candidate with host networking and the supplied read-only config, then requires Docker health plus 29/29 identity and analytics acceptance. Any startup, health, or acceptance failure removes the candidate and automatically restores the previous container.
+
+On success, keep the reported rollback container until live Protect checks and the soak finish. To restore it deliberately, the helper first stops and renames the candidate as a replacement checkpoint, so neither side is deleted during a manual rollback:
+
+```bash
+npm run deploy:transactional -- rollback \
+  --rollback-container onvif-vcam-server-rollback-YYYYMMDDTHHMMSSZ \
+  --apply
+```
+
+Use an immutable image digest for production. Candidate configs, `.env` files, and generated deployment checkpoints remain local and are ignored by Git. The tool does not modify the Protect database or the host MacVLAN configuration.
+
 ### Frigate Analytics Events
 
 Frigate detections can be translated into ONVIF PullPoint events and delivered through the same virtual camera that Protect has adopted. The bridge includes its own MQTT 3.1.1 client, so no extra MQTT package or sidecar is required.
