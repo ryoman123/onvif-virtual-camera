@@ -38,6 +38,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -47,3 +48,19 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/onvif-virtual-camera:${{ github.ref_name }}
             ghcr.io/${{ github.repository_owner }}/onvif-virtual-camera:${{ github.ref_name }}-${{ github.sha }}
             ${{ github.ref_name == 'main' && format('ghcr.io/{0}/onvif-virtual-camera:latest', github.repository_owner) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}-${{ github.sha }}
+
+      - name: Record immutable deployment image
+        if: ${{ github.ref_name != 'dev' }}
+        env:
+          DEPLOYMENT_IMAGE: ghcr.io/${{ github.repository_owner }}/onvif-virtual-camera@${{ steps.build.outputs.digest }}
+        run: |
+          echo "Deployment image: ${DEPLOYMENT_IMAGE}"
+          echo "### Immutable deployment image" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "\`${DEPLOYMENT_IMAGE}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Commit: \`${GITHUB_SHA}\`" >> "${GITHUB_STEP_SUMMARY}"
