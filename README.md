@@ -166,6 +166,28 @@ npm run deploy:transactional -- deploy \
 
 Repeat the exact command with `--apply` only after reviewing the JSON plan. The helper writes a private identity checkpoint, stops and renames the exact old container instead of deleting it, launches the candidate with host networking and the supplied read-only config, then requires Docker health plus 29/29 identity and analytics acceptance. With `--require-pullpoint-subscribers`, it waits up to the configured timeout for Protect to recreate every camera subscription instead of sampling only once immediately after startup. `--min-pullpoint-messages 1` additionally proves that each camera delivered a notification, and `--max-pullpoint-idle-seconds 120` rejects a stale Protect consumer even if its subscription still exists. Any startup, health, or acceptance timeout removes the candidate and automatically restores the previous container.
 
+For a supervised failure exercise, the same deployment gate can require real source traffic and reconnection evidence before it succeeds. Extend the timeout enough to interrupt and restore each source deliberately:
+
+```bash
+npm run deploy:transactional -- deploy \
+  --image ghcr.io/ryoman123/onvif-virtual-camera@sha256:CANDIDATE_DIGEST \
+  --config ./config.yml \
+  --env-file ./.env \
+  --expected-cameras 29 \
+  --require-frigate \
+  --min-frigate-events 1 \
+  --require-recorder lorex \
+  --require-recorder nvr69 \
+  --min-recorder-events lorex=1 \
+  --min-recorder-events nvr69=1 \
+  --min-recorder-connections lorex=2 \
+  --min-recorder-connections nvr69=2 \
+  --timeout-seconds 900 \
+  --apply
+```
+
+The connection count is process-local, so a minimum of `2` proves the candidate connected once and then recovered from at least one controlled recorder interruption. If any gate remains unsatisfied at the deadline, deployment restores the previous container automatically.
+
 On success, keep the reported rollback container and its private identity checkpoint until live Protect checks and the soak finish. To restore it deliberately, the helper first validates that checkpoint, then stops and renames the candidate as a replacement checkpoint, so neither side is deleted during a manual rollback. The restored container must pass Docker health plus the same 29/29 identity and analytics acceptance gate before rollback succeeds. If it fails to start, become healthy, or pass acceptance, both names are restored and the candidate is restarted automatically:
 
 ```bash

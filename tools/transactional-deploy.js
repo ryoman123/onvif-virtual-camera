@@ -14,6 +14,14 @@ function positiveInteger(value, label) {
     return parsed;
 }
 
+function namedPositiveInteger(value, label) {
+    const separator = value.lastIndexOf("=");
+    if (separator <= 0) throw new Error(`${label} must use name=minimum`);
+    const name = value.slice(0, separator).trim();
+    if (!name) throw new Error(`${label} must include a name`);
+    return [name, positiveInteger(value.slice(separator + 1), label)];
+}
+
 function isImmutableImageReference(value) {
     return /^(?:[^@\s]+@)?sha256:[0-9a-f]{64}$/i.test(String(value || ""));
 }
@@ -28,7 +36,10 @@ function parseArgs(argv) {
         url: "http://127.0.0.1:9090/status",
         expectedCameras: 29,
         requireFrigate: false,
+        minFrigateEvents: undefined,
         requireRecorders: [],
+        minRecorderEvents: {},
+        minRecorderConnections: {},
         requirePullPointSubscribers: false,
         minPullPointMessages: undefined,
         maxPullPointIdleSeconds: undefined,
@@ -56,7 +67,16 @@ function parseArgs(argv) {
         else if (arg === "--url") options.url = next();
         else if (arg === "--expected-cameras") options.expectedCameras = positiveInteger(next(), arg);
         else if (arg === "--require-frigate") options.requireFrigate = true;
+        else if (arg === "--min-frigate-events") options.minFrigateEvents = positiveInteger(next(), arg);
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
+        else if (arg === "--min-recorder-events") {
+            const [name, value] = namedPositiveInteger(next(), arg);
+            options.minRecorderEvents[name] = value;
+        }
+        else if (arg === "--min-recorder-connections") {
+            const [name, value] = namedPositiveInteger(next(), arg);
+            options.minRecorderConnections[name] = value;
+        }
         else if (arg === "--require-pullpoint-subscribers") options.requirePullPointSubscribers = true;
         else if (arg === "--min-pullpoint-messages") options.minPullPointMessages = positiveInteger(next(), arg);
         else if (arg === "--max-pullpoint-idle-seconds") {
@@ -138,7 +158,10 @@ async function waitForAcceptance(options, identityManifest, dependencies) {
             expectedCameras: options.expectedCameras,
             expectedIdentities: identityManifest.cameras,
             requireFrigate: options.requireFrigate,
+            minFrigateEvents: options.minFrigateEvents,
             requireRecorders: options.requireRecorders,
+            minRecorderEvents: options.minRecorderEvents,
+            minRecorderConnections: options.minRecorderConnections,
             requirePullPointSubscribers: options.requirePullPointSubscribers,
             minPullPointMessages: options.minPullPointMessages,
             maxPullPointIdleSeconds: options.maxPullPointIdleSeconds,
@@ -327,6 +350,7 @@ module.exports = {
     createDockerExecutor,
     deploy,
     isImmutableImageReference,
+    namedPositiveInteger,
     parseArgs,
     rollback,
     timestampName,

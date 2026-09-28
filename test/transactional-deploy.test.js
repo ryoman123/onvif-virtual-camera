@@ -7,6 +7,7 @@ const path = require("node:path");
 const {
     deploy,
     isImmutableImageReference,
+    namedPositiveInteger,
     parseArgs,
     rollback,
     timestampName,
@@ -81,6 +82,11 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     assert.equal(options.container, "onvif-vcam-server");
     const gated = parseArgs([
         "deploy", "--image", "candidate",
+        "--require-frigate",
+        "--min-frigate-events", "1",
+        "--require-recorder", "lorex",
+        "--min-recorder-events", "lorex=1",
+        "--min-recorder-connections", "lorex=2",
         "--require-pullpoint-subscribers",
         "--min-pullpoint-messages", "1",
         "--max-pullpoint-idle-seconds", "120",
@@ -88,6 +94,11 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
         "--min-camera-smart-messages", "1"
     ]);
     assert.equal(gated.requirePullPointSubscribers, true);
+    assert.equal(gated.requireFrigate, true);
+    assert.equal(gated.minFrigateEvents, 1);
+    assert.deepEqual(gated.requireRecorders, ["lorex"]);
+    assert.deepEqual(gated.minRecorderEvents, { lorex: 1 });
+    assert.deepEqual(gated.minRecorderConnections, { lorex: 2 });
     assert.equal(gated.minPullPointMessages, 1);
     assert.equal(gated.maxPullPointIdleSeconds, 120);
     assert.equal(gated.minCameraAnalyticsEvents, 1);
@@ -98,6 +109,8 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     assert.throws(() => parseArgs([
         "deploy", "--image", "candidate", "--max-pullpoint-idle-seconds", "0"
     ]), /positive integer/);
+    assert.throws(() => namedPositiveInteger("lorex", "--minimum"), /name=minimum/);
+    assert.throws(() => namedPositiveInteger("lorex=0", "--minimum"), /positive integer/);
 });
 
 test("applied deployment requires an immutable image before Docker changes", async (t) => {
@@ -187,6 +200,46 @@ test("deployment acceptance rejects stale or undelivered PullPoint consumers", a
         now: () => { clock += 1000; return clock; },
         delay: async () => {}
     }), /delivered 0 PullPoint message.*consumer idle for 600s/);
+});
+
+test("deployment acceptance can require Frigate and recorder recovery evidence", async () => {
+    const current = status();
+    current.analytics.frigate = {
+        state: "connected",
+        available: true,
+        eventsDispatched: 1
+    };
+    current.analytics.recorders = [{
+        name: "lorex",
+        client: { state: "connected", connections: 2 },
+        runtime: { state: "connected", eventsDispatched: 1 }
+    }];
+
+    const result = await waitForAcceptance({
+        expectedCameras: 1,
+        requireFrigate: true,
+        minFrigateEvents: 1,
+        requireRecorders: ["lorex"],
+        minRecorderEvents: { lorex: 1 },
+        minRecorderConnections: { lorex: 2 },
+        requirePullPointSubscribers: false,
+        url: "http://example/status",
+        timeoutSeconds: 1,
+        intervalSeconds: 1
+    }, {
+        cameras: [{
+            name: "Cam1",
+            mac: "02:00:00:00:00:01",
+            serialNumber: "SER1",
+            hardwareId: "HW1"
+        }]
+    }, {
+        fetchJson: async () => current,
+        now: () => 0,
+        delay: async () => {}
+    });
+
+    assert.equal(result.passed, true);
 });
 
 test("rollback names are deterministic and Docker-safe", () => {
