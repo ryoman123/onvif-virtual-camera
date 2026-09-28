@@ -27,8 +27,8 @@ function status(overrides = {}) {
             total: 2,
             healthy: 2,
             items: [
-                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3, messagesDeliveredByTopic: { "UserAlarm/IVA/HumanShapeDetect": 2 }, lastPullRequestAt: "2026-09-27T14:59:30.000Z" } },
-                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2, messagesDeliveredByTopic: { "VehicleAlarm/IVB/VehicleDetect": 1 }, lastPullRequestAt: "2026-09-27T14:59:45.000Z" } }
+                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", startedAt: "2026-09-27T14:00:05.000Z", restartCount: 0, ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3, messagesDeliveredByTopic: { "UserAlarm/IVA/HumanShapeDetect": 2 }, lastPullRequestAt: "2026-09-27T14:59:30.000Z" } },
+                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", startedAt: "2026-09-27T14:00:06.000Z", restartCount: 0, ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2, messagesDeliveredByTopic: { "VehicleAlarm/IVB/VehicleDetect": 1 }, lastPullRequestAt: "2026-09-27T14:59:45.000Z" } }
             ]
         },
         analytics: {
@@ -331,10 +331,49 @@ test("soak fails if the bridge process restarts while otherwise healthy", async 
     assert.ok(result.failures.some((failure) => failure.includes("uptime regressed")));
 });
 
+test("soak fails if one virtual camera restarts without a bridge restart", async () => {
+    let requests = 0;
+    const result = await run({
+        url: "http://example/status",
+        expectedCameras: 2,
+        requireFrigate: false,
+        requireRecorders: [],
+        soakSeconds: 60,
+        intervalSeconds: 1,
+        timeoutMs: 100
+    }, {
+        fetchJson: async () => {
+            requests += 1;
+            const current = status();
+            if (requests > 1) {
+                current.uptimeSeconds = 3601;
+                current.cameras.items[1] = {
+                    ...current.cameras.items[1],
+                    restartCount: 1,
+                    events: {
+                        ...current.cameras.items[1].events,
+                        messagesDelivered: 0
+                    }
+                };
+            }
+            return current;
+        },
+        delay: async () => {}
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.samples, 2);
+    assert.ok(result.failures.some((failure) => failure.includes("restart count changed")));
+    assert.ok(result.failures.some((failure) => failure.includes("delivery counter regressed")));
+});
+
 test("soak refuses status without process continuity telemetry", async () => {
     const current = status();
     delete current.startedAt;
     delete current.uptimeSeconds;
+    delete current.cameras.items[0].startedAt;
+    delete current.cameras.items[1].restartCount;
+    delete current.cameras.items[1].events.messagesDelivered;
 
     const result = await run({
         url: "http://example/status",
@@ -353,4 +392,6 @@ test("soak refuses status without process continuity telemetry", async () => {
     assert.equal(result.samples, 1);
     assert.ok(result.failures.some((failure) => failure.includes("startedAt")));
     assert.ok(result.failures.some((failure) => failure.includes("uptimeSeconds")));
+    assert.ok(result.failures.some((failure) => failure.includes("restartCount")));
+    assert.ok(result.failures.some((failure) => failure.includes("delivery counter")));
 });

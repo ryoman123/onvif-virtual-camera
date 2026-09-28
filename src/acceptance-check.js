@@ -265,12 +265,36 @@ function evaluateContinuity(status, previous = null) {
     const failures = [];
     const startedAt = status?.startedAt;
     const uptimeSeconds = status?.uptimeSeconds;
+    const cameras = (status?.cameras?.items || []).map((camera) => ({
+        name: camera.name,
+        startedAt: camera.startedAt,
+        restartCount: camera.restartCount,
+        messagesDelivered: camera.events?.messagesDelivered
+    }));
 
     if (typeof startedAt !== "string" || !Number.isFinite(Date.parse(startedAt))) {
         failures.push("bridge startedAt is missing or invalid");
     }
     if (!Number.isFinite(uptimeSeconds) || uptimeSeconds < 0) {
         failures.push("bridge uptimeSeconds is missing or invalid");
+    }
+
+    for (const camera of cameras) {
+        if (
+            typeof camera.startedAt !== "string"
+            || !Number.isFinite(Date.parse(camera.startedAt))
+        ) {
+            failures.push(`${camera.name}: startedAt is missing or invalid`);
+        }
+        if (!Number.isInteger(camera.restartCount) || camera.restartCount < 0) {
+            failures.push(`${camera.name}: restartCount is missing or invalid`);
+        }
+        if (
+            !Number.isInteger(camera.messagesDelivered)
+            || camera.messagesDelivered < 0
+        ) {
+            failures.push(`${camera.name}: PullPoint delivery counter is missing or invalid`);
+        }
     }
 
     if (previous) {
@@ -288,11 +312,48 @@ function evaluateContinuity(status, previous = null) {
                 `bridge uptime regressed during soak (${previous.uptimeSeconds} -> ${uptimeSeconds})`
             );
         }
+
+        const previousCameras = new Map(
+            (previous.cameras || []).map((camera) => [camera.name, camera])
+        );
+        for (const camera of cameras) {
+            const prior = previousCameras.get(camera.name);
+            if (!prior) {
+                failures.push(`${camera.name}: appeared during soak`);
+                continue;
+            }
+            if (camera.startedAt !== prior.startedAt) {
+                failures.push(
+                    `${camera.name}: camera start time changed during soak ` +
+                    `(${prior.startedAt || "missing"} -> ${camera.startedAt || "missing"})`
+                );
+            }
+            if (camera.restartCount !== prior.restartCount) {
+                failures.push(
+                    `${camera.name}: restart count changed during soak ` +
+                    `(${prior.restartCount ?? "missing"} -> ${camera.restartCount ?? "missing"})`
+                );
+            }
+            if (
+                Number.isInteger(camera.messagesDelivered)
+                && Number.isInteger(prior.messagesDelivered)
+                && camera.messagesDelivered < prior.messagesDelivered
+            ) {
+                failures.push(
+                    `${camera.name}: PullPoint delivery counter regressed during soak ` +
+                    `(${prior.messagesDelivered} -> ${camera.messagesDelivered})`
+                );
+            }
+            previousCameras.delete(camera.name);
+        }
+        for (const name of previousCameras.keys()) {
+            failures.push(`${name}: disappeared during soak`);
+        }
     }
 
     return {
         failures,
-        current: { startedAt, uptimeSeconds }
+        current: { startedAt, uptimeSeconds, cameras }
     };
 }
 
