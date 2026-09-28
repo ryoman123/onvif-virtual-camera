@@ -227,7 +227,7 @@ analytics:
 - `inactivity_timeout_ms`: Reconnects if the long-lived stream stops delivering data. The 20-second default allows several missed 5-second heartbeats before recovery.
 - `tls_reject_unauthorized`: Defaults to `true`. Set it to `false` only when a local HTTPS recorder uses a certificate that the container cannot validate.
 
-The native parser currently translates `VideoMotion`, `SmartMotionHuman`, and `SmartMotionVehicle` into ONVIF motion, person, and vehicle property events. Native recorder events and Frigate detections may be enabled together; the dispatcher aggregates overlapping contributors before changing the ONVIF state.
+The native parser currently translates `VideoMotion`, `SmartMotionHuman`, and `SmartMotionVehicle` into ONVIF motion, person, and vehicle property events. Dahua `Pulse` actions are emitted as paired active/inactive transitions so they cannot leave a retained ONVIF property stuck on. Native recorder events and Frigate detections may be enabled together; the dispatcher aggregates overlapping contributors before changing the ONVIF state.
 
 ### Host Sources
 

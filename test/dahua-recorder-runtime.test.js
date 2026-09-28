@@ -17,6 +17,21 @@ test("routes recorder channel analytics to the mapped ONVIF camera",()=>{
  const pulled=bus.pull(sub.id,10); assert.equal(pulled.messages.length,1); assert.equal(pulled.messages[0].topic,TOPICS.PERSON);
  assert.equal(runtime.health().eventsDispatched,1); assert.equal(runtime.health().state,"connected");
 });
+test("turns Dahua Pulse into a self-clearing ONVIF property transition",()=>{
+ const {bus,runtime}=fixture(); const sub=bus.createSubscription({ttlMs:60000});
+ runtime.push("Code=SmartMotionHuman;action=Pulse;index=5\r\n");
+ const messages=bus.pull(sub.id,10).messages;
+ assert.deepEqual(messages.map(x=>x.data.State),[true,false]);
+ assert.equal(runtime.health().eventsDispatched,2);
+});
+
+test("Pulse does not clear an active Start contributor",()=>{
+ const {bus,runtime}=fixture(); const sub=bus.createSubscription({ttlMs:60000});
+ runtime.push("Code=SmartMotionHuman;action=Start;index=5\r\n");
+ runtime.push("Code=SmartMotionHuman;action=Pulse;index=5\r\n");
+ assert.deepEqual(bus.pull(sub.id,10).messages.map(x=>x.data.State),[true]);
+});
+
 test("contains unmapped recorder channels without cross-camera delivery",()=>{
  const {bus,runtime}=fixture(); const sub=bus.createSubscription({ttlMs:60000});
  runtime.push("Code=VideoMotion;action=Start;index=7\r\n");

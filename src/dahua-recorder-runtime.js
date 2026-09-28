@@ -7,6 +7,7 @@ class DahuaAnalyticsRouter extends EventEmitter {
         super();
         this.channelMap = new Map(Object.entries(options.channelMap || {}).map(([channel, camera]) => [Number(channel), camera]));
         this.source = options.source || "dahua";
+        this.pulseSequence = 0;
     }
 
     route(input) {
@@ -20,7 +21,10 @@ class DahuaAnalyticsRouter extends EventEmitter {
             source: this.source,
             camera,
             type: input.type,
-            active: input.active
+            active: input.active,
+            objectId: input.action === "pulse"
+                ? "pulse-" + (++this.pulseSequence)
+                : null
         });
         this.emit("analytics", event);
         return event;
@@ -74,6 +78,15 @@ class DahuaRecorderRuntime extends EventEmitter {
             const published = this.dispatcher.dispatch(event);
             if (published) this.eventsDispatched += 1;
             else this.droppedEvents += 1;
+
+            if (input.action === "pulse") {
+                const cleared = this.dispatcher.dispatch({
+                    ...event,
+                    active: false
+                });
+                if (cleared) this.eventsDispatched += 1;
+                else this.droppedEvents += 1;
+            }
         } catch (error) {
             this.droppedEvents += 1;
             this.errors += 1;

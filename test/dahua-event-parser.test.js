@@ -6,6 +6,9 @@ test("parses Dahua motion and smart-motion lifecycle events", () => {
     assert.deepEqual(parseDahuaEventLine("Code=VideoMotion;action=Start;index=5"), {source:"dahua",channel:5,type:"motion",active:true,action:"start",data:null});
     assert.equal(parseDahuaEventLine("Code=SmartMotionHuman;action=Stop;index=2").type, "person");
     assert.equal(parseDahuaEventLine("Code=SmartMotionVehicle;action=Start;index=3").type, "vehicle");
+    const pulse = parseDahuaEventLine("Code=VideoMotion;action=Pulse;index=1");
+    assert.equal(pulse.action, "pulse");
+    assert.equal(pulse.active, true);
 });
 
 test("stream parser tolerates multipart boundaries and fragmented records", () => {
