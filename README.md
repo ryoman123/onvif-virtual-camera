@@ -96,6 +96,16 @@ npm run acceptance:check -- \
 
 The identity manifest is deliberately separate from `config.yml`, contains no credentials, and should be captured from the last trusted deployment. It prevents a same-count replacement from silently changing the MAC-derived WS-Discovery identity or ONVIF serial/hardware identity Protect adopted:
 
+Capture it from a healthy trusted deployment before changing the image or configuration:
+
+```bash
+npm run identity:capture -- \
+  --expected-cameras 29 \
+  --output ./camera-identities.json
+```
+
+The capture fails unless the bridge reports exactly 29 fully healthy cameras with unique names, MAC addresses, serial numbers, and hardware IDs. It writes only those non-secret identity fields, uses file mode `0600`, refuses to replace an existing checkpoint unless `--force` is explicitly supplied, and keeps the generated file out of Git. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding.
+
 ```json
 {
   "cameras": [

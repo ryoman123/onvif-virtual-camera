@@ -19,6 +19,7 @@ credentials/
 *.keystore
 
 # Local diagnostic and generated files
+camera-identities*.json
 vcam-probe-results.json
 lorex-snapshot-config-backup-*.txt
 *.log
