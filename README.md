@@ -125,11 +125,12 @@ npm run acceptance:check -- \
   --min-recorder-connections nvr69=2 \
   --require-pullpoint-subscribers \
   --min-pullpoint-messages 1 \
+  --max-pullpoint-idle-seconds 120 \
   --soak-seconds 43200 \
   --interval-seconds 30
 ```
 
-The analytics event minimums prove that each configured source dispatched a real event since process start. `--require-pullpoint-subscribers` proves that Protect (or another ONVIF client) has an active PullPoint on every virtual camera, while `--min-pullpoint-messages 1` proves at least one notification crossed each camera's PullPoint boundary. A recorder connection minimum of `2` proves the client established a second connection after a controlled interruption. Start the soak only after generating representative detections on every camera and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
+The analytics event minimums prove that each configured source dispatched a real event since process start. `--require-pullpoint-subscribers` proves that Protect (or another ONVIF client) has an active PullPoint on every virtual camera, while `--min-pullpoint-messages 1` proves at least one notification crossed each camera's PullPoint boundary. `--max-pullpoint-idle-seconds 120` also requires a recent `PullMessages` request from every camera, so a stalled Protect consumer cannot pass on an old subscriber and historical delivery counter. A recorder connection minimum of `2` proves the client established a second connection after a controlled interruption. Start the soak only after generating representative detections on every camera and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
 
 The command prints a machine-readable JSON result and exits non-zero on the first failed sample. A soak also pins the bridge process start time and requires monotonically increasing uptime, so a container/process restart cannot disappear between otherwise healthy samples. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
 

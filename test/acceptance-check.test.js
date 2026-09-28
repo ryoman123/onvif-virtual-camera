@@ -20,14 +20,15 @@ const lifecycle = Object.freeze({
 function status(overrides = {}) {
     return {
         status: "healthy",
+        timestamp: "2026-09-27T15:00:00.000Z",
         startedAt: "2026-09-27T14:00:00.000Z",
         uptimeSeconds: 3600,
         cameras: {
             total: 2,
             healthy: 2,
             items: [
-                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3 } },
-                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2 } }
+                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3, lastPullRequestAt: "2026-09-27T14:59:30.000Z" } },
+                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2, lastPullRequestAt: "2026-09-27T14:59:45.000Z" } }
             ]
         },
         analytics: {
@@ -56,7 +57,8 @@ test("acceptance validates camera identities and required analytics", () => {
         minRecorderEvents: { lorex: 4 },
         minRecorderConnections: { lorex: 2 },
         requirePullPointSubscribers: true,
-        minPullPointMessages: 2
+        minPullPointMessages: 2,
+        maxPullPointIdleSeconds: 60
     });
     assert.equal(result.passed, true);
     assert.equal(result.cameras.found, 2);
@@ -97,6 +99,26 @@ test("acceptance requires Protect-facing PullPoint delivery evidence when reques
     assert.equal(result.passed, false);
     assert.ok(result.failures.some((failure) => failure.includes("no active PullPoint subscriber")));
     assert.ok(result.failures.some((failure) => failure.includes("delivered 0 PullPoint message")));
+});
+
+test("acceptance rejects a stale or missing PullPoint consumer", () => {
+    const stale = status();
+    stale.cameras.items[0] = {
+        ...stale.cameras.items[0],
+        events: {
+            ...stale.cameras.items[0].events,
+            lastPullRequestAt: "2026-09-27T14:55:00.000Z"
+        }
+    };
+    delete stale.cameras.items[1].events.lastPullRequestAt;
+
+    const result = evaluateAcceptance(stale, {
+        maxPullPointIdleSeconds: 120
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => failure.includes("idle for 300s")));
+    assert.ok(result.failures.some((failure) => failure.includes("no valid recent PullPoint")));
 });
 
 test("acceptance requires positive Frigate availability evidence", () => {
@@ -183,6 +205,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         "--require-recorder", "nvr69",
         "--require-pullpoint-subscribers",
         "--min-pullpoint-messages", "1",
+        "--max-pullpoint-idle-seconds", "120",
         "--soak-seconds", "3600",
         "--interval-seconds", "15"
     ]), {
@@ -196,6 +219,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         minRecorderConnections: {},
         requirePullPointSubscribers: true,
         minPullPointMessages: 1,
+        maxPullPointIdleSeconds: 120,
         soakSeconds: 3600,
         intervalSeconds: 15,
         timeoutMs: 5000

@@ -51,7 +51,11 @@ test("subscription queues matching published events", () => {
 });
 
 test("health exposes cumulative PullPoint delivery evidence", () => {
-    const bus = new EventBus({ topics: ["tns1:RuleEngine/CellMotionDetector/Motion"] });
+    const time = clock();
+    const bus = new EventBus({
+        now: time.now,
+        topics: ["tns1:RuleEngine/CellMotionDetector/Motion"]
+    });
     const subscription = bus.createSubscription();
 
     bus.publish({
@@ -71,6 +75,7 @@ test("health exposes cumulative PullPoint delivery evidence", () => {
         sequence: 2,
         subscriptionsCreated: 1,
         pullRequests: 1,
+        lastPullRequestAt: "2026-09-26T20:00:00.000Z",
         messagesDelivered: 1,
         synchronizationPoints: 1
     });
@@ -297,6 +302,21 @@ test("pullAsync wakes as soon as a matching event is published", async () => {
 
     assert.equal(result.messages.length, 1);
     assert.equal(result.messages[0].topic, TOPICS.PERSON);
+});
+
+test("health records a pending long-poll as live consumer activity", async () => {
+    const time = clock();
+    const bus = new EventBus({ now: time.now });
+    const sub = bus.createSubscription({ id: "active-consumer" });
+
+    const pending = bus.pullAsync(sub.id, 10, 1000);
+    assert.equal(
+        bus.health().lastPullRequestAt,
+        "2026-09-26T20:00:00.000Z"
+    );
+
+    bus.releaseAllWaiters();
+    await pending;
 });
 
 test("pullAsync returns an empty batch on timeout", async () => {

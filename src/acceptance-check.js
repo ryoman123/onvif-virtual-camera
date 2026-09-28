@@ -95,6 +95,21 @@ function evaluateAcceptance(status, options = {}) {
                 );
             }
         }
+        if (Number.isInteger(options.maxPullPointIdleSeconds)) {
+            const observedAt = Date.parse(status?.timestamp);
+            const lastPullAt = Date.parse(camera.events?.lastPullRequestAt);
+            if (!Number.isFinite(observedAt) || !Number.isFinite(lastPullAt)) {
+                failures.push(`${camera.name}: no valid recent PullPoint request timestamp`);
+            } else {
+                const idleSeconds = Math.max(0, Math.floor((observedAt - lastPullAt) / 1000));
+                if (idleSeconds > options.maxPullPointIdleSeconds) {
+                    failures.push(
+                        `${camera.name}: PullPoint consumer idle for ${idleSeconds}s, ` +
+                        `maximum is ${options.maxPullPointIdleSeconds}s`
+                    );
+                }
+            }
+        }
     }
 
     const analytics = status?.analytics;

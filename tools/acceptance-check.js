@@ -27,6 +27,7 @@ function parseArgs(argv) {
         minRecorderConnections: {},
         requirePullPointSubscribers: false,
         minPullPointMessages: undefined,
+        maxPullPointIdleSeconds: undefined,
         soakSeconds: 0,
         intervalSeconds: 30,
         timeoutMs: 5000
@@ -58,6 +59,8 @@ function parseArgs(argv) {
             options.requirePullPointSubscribers = true;
         } else if (arg === "--min-pullpoint-messages") {
             options.minPullPointMessages = parsePositiveInteger(next(), arg, true);
+        } else if (arg === "--max-pullpoint-idle-seconds") {
+            options.maxPullPointIdleSeconds = parsePositiveInteger(next(), arg);
         } else if (arg === "--soak-seconds") {
             options.soakSeconds = parsePositiveInteger(next(), arg, true);
         } else if (arg === "--interval-seconds") {

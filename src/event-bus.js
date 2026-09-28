@@ -78,6 +78,7 @@ class EventBus {
         this.pullRequests = 0;
         this.messagesDelivered = 0;
         this.synchronizationPoints = 0;
+        this.lastPullRequestAt = null;
         this.subscriptions = new Map();
         this.retained = new Map();
         this.topicRegistry = new Set(options.topics || []);
@@ -223,6 +224,7 @@ class EventBus {
         const limit = normalizeMessageLimit(messageLimit);
         const messages = subscription.queue.splice(0, limit);
         this.pullRequests += 1;
+        this.lastPullRequestAt = new Date(this.now()).toISOString();
         this.messagesDelivered += messages.length;
 
         return {
@@ -235,6 +237,7 @@ class EventBus {
         const subscription = this.requireSubscription(id);
         const limit = normalizeMessageLimit(messageLimit);
         const requestedTimeout = Number(timeoutMs);
+        this.lastPullRequestAt = new Date(this.now()).toISOString();
 
         if (!Number.isFinite(requestedTimeout) || requestedTimeout < 0) {
             throw new Error("timeoutMs must be a non-negative number");
@@ -356,6 +359,7 @@ class EventBus {
             sequence: this.sequence,
             subscriptionsCreated: this.subscriptionsCreated,
             pullRequests: this.pullRequests,
+            lastPullRequestAt: this.lastPullRequestAt,
             messagesDelivered: this.messagesDelivered,
             synchronizationPoints: this.synchronizationPoints
         });
