@@ -149,6 +149,28 @@ test("expired PullPoints do not consume subscription capacity", async () => {
     );
 });
 
+test("unknown PullPoint returns the WS-Resource ResourceUnknownFault", async () => {
+    const bus = new EventBus({ topics: DEFAULT_TOPICS });
+    const service = new EventService(cameraFixture(), bus);
+
+    await assert.rejects(
+        () => service.PullMessages(
+            { Timeout: "PT0S", MessageLimit: 1 },
+            null,
+            null,
+            { onvifSubscriptionId: "expired-subscription" }
+        ),
+        (error) => {
+            assert.equal(
+                error.Fault.Code.Subcode.Value,
+                "wsrf-r:ResourceUnknownFault"
+            );
+            assert.equal(error.Fault.Reason.Text, "Resource Unknown");
+            return true;
+        }
+    );
+});
+
 test("PullMessages accepts SOAP-wrapped MessageLimit scalars", async () => {
     const bus = new EventBus({ topics: DEFAULT_TOPICS });
     const service = new EventService(cameraFixture(), bus, {

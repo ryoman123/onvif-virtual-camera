@@ -45,6 +45,13 @@ function invalidArgs() {
     });
 }
 
+function resourceUnknown() {
+    return createFault({
+        subcodes: ["wsrf-r:ResourceUnknownFault"],
+        reason: "Resource Unknown"
+    });
+}
+
 function noProfile() {
     return createFault({
         subcodes: ["ter:InvalidArgVal", "ter:NoProfile"],
@@ -69,6 +76,7 @@ function invalidStreamSetup() {
 module.exports = {
     createFault,
     invalidArgs,
+    resourceUnknown,
     noProfile,
     noConfig,
     invalidStreamSetup

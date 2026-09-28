@@ -124,6 +124,9 @@ class EventService {
         }
 
         if (error instanceof EventSubscriptionError) {
+            if (error.code === "resource-unknown") {
+                throw faults.resourceUnknown();
+            }
             throw faults.invalidArgs();
         }
 
