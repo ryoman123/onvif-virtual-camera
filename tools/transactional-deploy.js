@@ -25,6 +25,8 @@ function parseArgs(argv) {
         requireFrigate: false,
         requireRecorders: [],
         requirePullPointSubscribers: false,
+        minCameraAnalyticsEvents: undefined,
+        minCameraSmartMessages: undefined,
         checkpointDir: "deployment-checkpoints",
         timeoutSeconds: 180,
         intervalSeconds: 2,
@@ -49,6 +51,8 @@ function parseArgs(argv) {
         else if (arg === "--require-frigate") options.requireFrigate = true;
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
         else if (arg === "--require-pullpoint-subscribers") options.requirePullPointSubscribers = true;
+        else if (arg === "--min-camera-analytics-events") options.minCameraAnalyticsEvents = positiveInteger(next(), arg);
+        else if (arg === "--min-camera-smart-messages") options.minCameraSmartMessages = positiveInteger(next(), arg);
         else if (arg === "--checkpoint-dir") options.checkpointDir = next();
         else if (arg === "--timeout-seconds") options.timeoutSeconds = positiveInteger(next(), arg);
         else if (arg === "--interval-seconds") options.intervalSeconds = positiveInteger(next(), arg);
@@ -124,7 +128,9 @@ async function waitForAcceptance(options, identityManifest, dependencies) {
             expectedIdentities: identityManifest.cameras,
             requireFrigate: options.requireFrigate,
             requireRecorders: options.requireRecorders,
-            requirePullPointSubscribers: options.requirePullPointSubscribers
+            requirePullPointSubscribers: options.requirePullPointSubscribers,
+            minCameraAnalyticsEvents: options.minCameraAnalyticsEvents,
+            minCameraSmartMessages: options.minCameraSmartMessages
         });
         if (lastResult.passed) return lastResult;
         if (dependencies.now() >= deadline) {

@@ -28,6 +28,7 @@ function parseArgs(argv) {
         minRecorderConnections: {},
         requirePullPointSubscribers: false,
         minPullPointMessages: undefined,
+        minCameraSmartMessages: undefined,
         maxPullPointIdleSeconds: undefined,
         soakSeconds: 0,
         intervalSeconds: 30,
@@ -63,6 +64,8 @@ function parseArgs(argv) {
             options.requirePullPointSubscribers = true;
         } else if (arg === "--min-pullpoint-messages") {
             options.minPullPointMessages = parsePositiveInteger(next(), arg, true);
+        } else if (arg === "--min-camera-smart-messages") {
+            options.minCameraSmartMessages = parsePositiveInteger(next(), arg);
         } else if (arg === "--max-pullpoint-idle-seconds") {
             options.maxPullPointIdleSeconds = parsePositiveInteger(next(), arg);
         } else if (arg === "--soak-seconds") {

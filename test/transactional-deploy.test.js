@@ -9,6 +9,7 @@ const {
     parseArgs,
     rollback,
     timestampName,
+    waitForAcceptance,
     waitForHealthy
 } = require("../tools/transactional-deploy");
 
@@ -61,9 +62,51 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     assert.equal(options.apply, false);
     assert.equal(options.expectedCameras, 29);
     assert.equal(options.container, "onvif-vcam-server");
-    assert.equal(parseArgs([
-        "deploy", "--image", "candidate", "--require-pullpoint-subscribers"
-    ]).requirePullPointSubscribers, true);
+    const gated = parseArgs([
+        "deploy", "--image", "candidate",
+        "--require-pullpoint-subscribers",
+        "--min-camera-analytics-events", "1",
+        "--min-camera-smart-messages", "1"
+    ]);
+    assert.equal(gated.requirePullPointSubscribers, true);
+    assert.equal(gated.minCameraAnalyticsEvents, 1);
+    assert.equal(gated.minCameraSmartMessages, 1);
+    assert.throws(() => parseArgs([
+        "deploy", "--image", "candidate", "--min-camera-smart-messages", "0"
+    ]), /positive integer/);
+});
+
+test("deployment acceptance can require routed and delivered smart events", async () => {
+    const current = status();
+    current.cameras.items[0].events = {
+        messagesDeliveredByTopic: { "UserAlarm/IVA/HumanShapeDetect": 1 }
+    };
+    current.analytics.routing = [{ camera: "Cam1", eventsDispatched: 1 }];
+
+    const result = await waitForAcceptance({
+        expectedCameras: 1,
+        requireFrigate: false,
+        requireRecorders: [],
+        requirePullPointSubscribers: false,
+        minCameraAnalyticsEvents: 1,
+        minCameraSmartMessages: 1,
+        url: "http://example/status",
+        timeoutSeconds: 1,
+        intervalSeconds: 1
+    }, {
+        cameras: [{
+            name: "Cam1",
+            mac: "02:00:00:00:00:01",
+            serialNumber: "SER1",
+            hardwareId: "HW1"
+        }]
+    }, {
+        fetchJson: async () => current,
+        now: () => 0,
+        delay: async () => {}
+    });
+
+    assert.equal(result.passed, true);
 });
 
 test("rollback names are deterministic and Docker-safe", () => {

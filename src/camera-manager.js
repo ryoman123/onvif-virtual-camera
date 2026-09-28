@@ -60,6 +60,7 @@ class CameraManager {
                 subscriptionsCreated: 0,
                 pullRequests: 0,
                 messagesDelivered: 0,
+                messagesDeliveredByTopic: Object.freeze({}),
                 synchronizationPoints: 0
             })
         });

@@ -27,8 +27,8 @@ function status(overrides = {}) {
             total: 2,
             healthy: 2,
             items: [
-                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3, lastPullRequestAt: "2026-09-27T14:59:30.000Z" } },
-                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2, lastPullRequestAt: "2026-09-27T14:59:45.000Z" } }
+                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3, messagesDeliveredByTopic: { "UserAlarm/IVA/HumanShapeDetect": 2 }, lastPullRequestAt: "2026-09-27T14:59:30.000Z" } },
+                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2, messagesDeliveredByTopic: { "VehicleAlarm/IVB/VehicleDetect": 1 }, lastPullRequestAt: "2026-09-27T14:59:45.000Z" } }
             ]
         },
         analytics: {
@@ -63,10 +63,33 @@ test("acceptance validates camera identities and required analytics", () => {
         minRecorderConnections: { lorex: 2 },
         requirePullPointSubscribers: true,
         minPullPointMessages: 2,
+        minCameraSmartMessages: 1,
         maxPullPointIdleSeconds: 60
     });
     assert.equal(result.passed, true);
     assert.equal(result.cameras.found, 2);
+});
+
+test("acceptance requires smart-detection PullPoint delivery from every camera", () => {
+    const broken = status();
+    broken.cameras.items[1] = {
+        ...broken.cameras.items[1],
+        events: {
+            ...broken.cameras.items[1].events,
+            messagesDeliveredByTopic: {
+                "RuleEngine/CellMotionDetector/Motion": 2
+            }
+        }
+    };
+
+    const result = evaluateAcceptance(broken, {
+        minCameraSmartMessages: 1
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => (
+        failure.includes("Cam2: delivered 0 smart-detection PullPoint message")
+    )));
 });
 
 test("acceptance requires routed analytics evidence from every camera", () => {
@@ -228,6 +251,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         "--require-recorder", "nvr69",
         "--require-pullpoint-subscribers",
         "--min-camera-analytics-events", "1",
+        "--min-camera-smart-messages", "1",
         "--min-pullpoint-messages", "1",
         "--max-pullpoint-idle-seconds", "120",
         "--soak-seconds", "3600",
@@ -239,6 +263,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         requireRecorders: ["lorex", "nvr69"],
         identityManifest: null,
         minCameraAnalyticsEvents: 1,
+        minCameraSmartMessages: 1,
         minFrigateEvents: undefined,
         minRecorderEvents: {},
         minRecorderConnections: {},

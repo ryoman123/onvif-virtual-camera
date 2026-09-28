@@ -129,6 +129,7 @@ npm run acceptance:check -- \
   --require-recorder nvr69 \
   --identity-manifest ./camera-identities.json \
   --min-camera-analytics-events 1 \
+  --min-camera-smart-messages 1 \
   --min-frigate-events 1 \
   --min-recorder-events lorex=1 \
   --min-recorder-events nvr69=1 \
@@ -141,7 +142,7 @@ npm run acceptance:check -- \
   --interval-seconds 30
 ```
 
-The source event minimums prove that each configured source dispatched a real event since process start. `--min-camera-analytics-events 1` additionally requires a routed property transition on every virtual camera, so activity on one busy camera cannot hide a silent or incorrectly mapped camera. `--require-pullpoint-subscribers` proves that Protect (or another ONVIF client) has an active PullPoint on every virtual camera, while `--min-pullpoint-messages 1` proves at least one notification crossed each camera's PullPoint boundary. `--max-pullpoint-idle-seconds 120` also requires a recent `PullMessages` request from every camera, so a stalled Protect consumer cannot pass on an old subscriber and historical delivery counter. A recorder connection minimum of `2` proves the client established a second connection after a controlled interruption. Start the soak only after generating representative detections on every camera and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
+The source event minimums prove that each configured source dispatched a real event since process start. `--min-camera-analytics-events 1` additionally requires a routed property transition on every virtual camera, so activity on one busy camera cannot hide a silent or incorrectly mapped camera. `--min-camera-smart-messages 1` goes one boundary further: every camera must have returned at least one person, vehicle, animal, or package notification through PullPoint. Generic motion and empty long polls do not satisfy it. `--require-pullpoint-subscribers` proves that Protect (or another ONVIF client) has an active PullPoint on every virtual camera, while `--min-pullpoint-messages 1` proves at least one notification crossed each camera's PullPoint boundary. `--max-pullpoint-idle-seconds 120` also requires a recent `PullMessages` request from every camera, so a stalled Protect consumer cannot pass on an old subscriber and historical delivery counter. A recorder connection minimum of `2` proves the client established a second connection after a controlled interruption. Start the soak only after generating representative detections on every camera and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
 
 The command prints a machine-readable JSON result and exits non-zero on the first failed sample. A soak also pins the bridge process start time and requires monotonically increasing uptime, so a container/process restart cannot disappear between otherwise healthy samples. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
 

@@ -77,6 +77,7 @@ class EventBus {
         this.subscriptionsCreated = 0;
         this.pullRequests = 0;
         this.messagesDelivered = 0;
+        this.messagesDeliveredByTopic = new Map();
         this.synchronizationPoints = 0;
         this.lastPullRequestAt = null;
         this.subscriptions = new Map();
@@ -226,6 +227,12 @@ class EventBus {
         this.pullRequests += 1;
         this.lastPullRequestAt = new Date(this.now()).toISOString();
         this.messagesDelivered += messages.length;
+        for (const message of messages) {
+            this.messagesDeliveredByTopic.set(
+                message.topic,
+                (this.messagesDeliveredByTopic.get(message.topic) || 0) + 1
+            );
+        }
 
         return {
             subscription: this.describeSubscription(subscription),
@@ -361,6 +368,11 @@ class EventBus {
             pullRequests: this.pullRequests,
             lastPullRequestAt: this.lastPullRequestAt,
             messagesDelivered: this.messagesDelivered,
+            messagesDeliveredByTopic: Object.freeze(Object.fromEntries(
+                [...this.messagesDeliveredByTopic.entries()].sort(([a], [b]) => (
+                    a.localeCompare(b)
+                ))
+            )),
             synchronizationPoints: this.synchronizationPoints
         });
     }

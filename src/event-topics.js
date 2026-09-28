@@ -103,6 +103,12 @@ const TOPIC_DEFINITIONS = Object.freeze([
 ]);
 
 const DEFAULT_TOPICS = Object.freeze(TOPIC_DEFINITIONS.map((definition) => definition.topic));
+const SMART_DETECTION_TOPICS = Object.freeze([
+    TOPICS.PERSON,
+    TOPICS.VEHICLE,
+    TOPICS.ANIMAL,
+    TOPICS.PACKAGE
+]);
 
 function getTopicDefinition(topic) {
     return TOPIC_DEFINITIONS.find((definition) => definition.topic === topic) || null;
@@ -112,5 +118,6 @@ module.exports = {
     TOPICS,
     TOPIC_DEFINITIONS,
     DEFAULT_TOPICS,
+    SMART_DETECTION_TOPICS,
     getTopicDefinition
 };

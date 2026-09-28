@@ -1,5 +1,6 @@
 const http = require("http");
 const https = require("https");
+const { SMART_DETECTION_TOPICS } = require("./event-topics");
 
 const READY_LIFECYCLE = Object.freeze([
     "configLoaded",
@@ -92,6 +93,19 @@ function evaluateAcceptance(status, options = {}) {
                 failures.push(
                     `${camera.name}: delivered ${delivered} PullPoint message(s), ` +
                     `expected at least ${options.minPullPointMessages}`
+                );
+            }
+        }
+        if (Number.isInteger(options.minCameraSmartMessages)) {
+            const byTopic = camera.events?.messagesDeliveredByTopic || {};
+            const delivered = SMART_DETECTION_TOPICS.reduce(
+                (total, topic) => total + (byTopic[topic] ?? 0),
+                0
+            );
+            if (delivered < options.minCameraSmartMessages) {
+                failures.push(
+                    `${camera.name}: delivered ${delivered} smart-detection PullPoint message(s), ` +
+                    `expected at least ${options.minCameraSmartMessages}`
                 );
             }
         }

@@ -77,6 +77,9 @@ test("health exposes cumulative PullPoint delivery evidence", () => {
         pullRequests: 1,
         lastPullRequestAt: "2026-09-26T20:00:00.000Z",
         messagesDelivered: 1,
+        messagesDeliveredByTopic: {
+            "tns1:RuleEngine/CellMotionDetector/Motion": 1
+        },
         synchronizationPoints: 1
     });
 });
