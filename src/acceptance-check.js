@@ -80,6 +80,21 @@ function evaluateAcceptance(status, options = {}) {
                 failures.push(`${camera.name}: lifecycle.${key} is not ready`);
             }
         }
+        if (
+            options.requirePullPointSubscribers
+            && (camera.events?.subscriptions ?? 0) < 1
+        ) {
+            failures.push(`${camera.name}: no active PullPoint subscriber`);
+        }
+        if (Number.isInteger(options.minPullPointMessages)) {
+            const delivered = camera.events?.messagesDelivered ?? 0;
+            if (delivered < options.minPullPointMessages) {
+                failures.push(
+                    `${camera.name}: delivered ${delivered} PullPoint message(s), ` +
+                    `expected at least ${options.minPullPointMessages}`
+                );
+            }
+        }
     }
 
     const analytics = status?.analytics;

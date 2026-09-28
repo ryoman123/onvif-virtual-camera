@@ -56,7 +56,11 @@ class CameraManager {
                 retained: 0,
                 queued: 0,
                 waiters: 0,
-                sequence: 0
+                sequence: 0,
+                subscriptionsCreated: 0,
+                pullRequests: 0,
+                messagesDelivered: 0,
+                synchronizationPoints: 0
             })
         });
     }

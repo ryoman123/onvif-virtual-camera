@@ -24,6 +24,8 @@ function parseArgs(argv) {
         minFrigateEvents: undefined,
         minRecorderEvents: {},
         minRecorderConnections: {},
+        requirePullPointSubscribers: false,
+        minPullPointMessages: undefined,
         soakSeconds: 0,
         intervalSeconds: 30,
         timeoutMs: 5000
@@ -51,6 +53,10 @@ function parseArgs(argv) {
         } else if (arg === "--min-recorder-connections") {
             const [name, value] = parseNamedMinimum(next(), arg);
             options.minRecorderConnections[name] = value;
+        } else if (arg === "--require-pullpoint-subscribers") {
+            options.requirePullPointSubscribers = true;
+        } else if (arg === "--min-pullpoint-messages") {
+            options.minPullPointMessages = parsePositiveInteger(next(), arg, true);
         } else if (arg === "--soak-seconds") {
             options.soakSeconds = parsePositiveInteger(next(), arg, true);
         } else if (arg === "--interval-seconds") {

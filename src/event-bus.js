@@ -74,6 +74,10 @@ class EventBus {
             : DEFAULT_MAX_QUEUE;
 
         this.sequence = 0;
+        this.subscriptionsCreated = 0;
+        this.pullRequests = 0;
+        this.messagesDelivered = 0;
+        this.synchronizationPoints = 0;
         this.subscriptions = new Map();
         this.retained = new Map();
         this.topicRegistry = new Set(options.topics || []);
@@ -118,6 +122,7 @@ class EventBus {
         };
 
         this.subscriptions.set(id, subscription);
+        this.subscriptionsCreated += 1;
 
         return this.describeSubscription(subscription);
     }
@@ -217,6 +222,8 @@ class EventBus {
         const subscription = this.requireSubscription(id);
         const limit = normalizeMessageLimit(messageLimit);
         const messages = subscription.queue.splice(0, limit);
+        this.pullRequests += 1;
+        this.messagesDelivered += messages.length;
 
         return {
             subscription: this.describeSubscription(subscription),
@@ -295,6 +302,7 @@ class EventBus {
 
     setSynchronizationPoint(id) {
         const subscription = this.requireSubscription(id);
+        this.synchronizationPoints += 1;
         const nowIso = new Date(this.now()).toISOString();
         let queued = 0;
 
@@ -345,7 +353,11 @@ class EventBus {
             retained: this.retained.size,
             queued,
             waiters,
-            sequence: this.sequence
+            sequence: this.sequence,
+            subscriptionsCreated: this.subscriptionsCreated,
+            pullRequests: this.pullRequests,
+            messagesDelivered: this.messagesDelivered,
+            synchronizationPoints: this.synchronizationPoints
         });
     }
 

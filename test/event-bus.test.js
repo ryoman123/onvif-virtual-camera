@@ -50,6 +50,32 @@ test("subscription queues matching published events", () => {
     assert.deepEqual(result.messages[0].data, { IsMotion: true });
 });
 
+test("health exposes cumulative PullPoint delivery evidence", () => {
+    const bus = new EventBus({ topics: ["tns1:RuleEngine/CellMotionDetector/Motion"] });
+    const subscription = bus.createSubscription();
+
+    bus.publish({
+        topic: "tns1:RuleEngine/CellMotionDetector/Motion",
+        data: { IsMotion: true }
+    });
+    const result = bus.pull(subscription.id, 10);
+    bus.setSynchronizationPoint(subscription.id);
+
+    assert.equal(result.messages.length, 1);
+    assert.deepEqual(bus.health(), {
+        topics: 1,
+        subscriptions: 1,
+        retained: 1,
+        queued: 1,
+        waiters: 0,
+        sequence: 2,
+        subscriptionsCreated: 1,
+        pullRequests: 1,
+        messagesDelivered: 1,
+        synchronizationPoints: 1
+    });
+});
+
 test("topic-filtered subscriptions receive only selected topics", () => {
     const bus = new EventBus();
     const sub = bus.createSubscription({

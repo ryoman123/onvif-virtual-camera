@@ -24,8 +24,8 @@ function status(overrides = {}) {
             total: 2,
             healthy: 2,
             items: [
-                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle },
-                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle }
+                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle, events: { subscriptions: 1, messagesDelivered: 3 } },
+                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle, events: { subscriptions: 1, messagesDelivered: 2 } }
             ]
         },
         analytics: {
@@ -52,7 +52,9 @@ test("acceptance validates camera identities and required analytics", () => {
         requireRecorders: ["lorex"],
         minFrigateEvents: 3,
         minRecorderEvents: { lorex: 4 },
-        minRecorderConnections: { lorex: 2 }
+        minRecorderConnections: { lorex: 2 },
+        requirePullPointSubscribers: true,
+        minPullPointMessages: 2
     });
     assert.equal(result.passed, true);
     assert.equal(result.cameras.found, 2);
@@ -76,6 +78,23 @@ test("acceptance reports identity, event-delivery and reconnect evidence failure
     assert.ok(result.failures.some((failure) => failure.includes("Frigate dispatched 3")));
     assert.ok(result.failures.some((failure) => failure.includes("lorex: dispatched 4")));
     assert.ok(result.failures.some((failure) => failure.includes("established 2 connection")));
+});
+
+test("acceptance requires Protect-facing PullPoint delivery evidence when requested", () => {
+    const broken = status();
+    broken.cameras.items[0] = {
+        ...broken.cameras.items[0],
+        events: { subscriptions: 0, messagesDelivered: 0 }
+    };
+
+    const result = evaluateAcceptance(broken, {
+        requirePullPointSubscribers: true,
+        minPullPointMessages: 1
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => failure.includes("no active PullPoint subscriber")));
+    assert.ok(result.failures.some((failure) => failure.includes("delivered 0 PullPoint message")));
 });
 
 test("named minimum arguments reject ambiguous values", () => {
@@ -148,6 +167,8 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         "--require-frigate",
         "--require-recorder", "lorex",
         "--require-recorder", "nvr69",
+        "--require-pullpoint-subscribers",
+        "--min-pullpoint-messages", "1",
         "--soak-seconds", "3600",
         "--interval-seconds", "15"
     ]), {
@@ -159,6 +180,8 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         minFrigateEvents: undefined,
         minRecorderEvents: {},
         minRecorderConnections: {},
+        requirePullPointSubscribers: true,
+        minPullPointMessages: 1,
         soakSeconds: 3600,
         intervalSeconds: 15,
         timeoutMs: 5000
