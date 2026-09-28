@@ -6,12 +6,16 @@ const path = require("node:path");
 
 const {
     deploy,
+    isImmutableImageReference,
     parseArgs,
     rollback,
     timestampName,
     waitForAcceptance,
     waitForHealthy
 } = require("../tools/transactional-deploy");
+
+const CANDIDATE_IMAGE =
+    "ghcr.io/example/vcam@sha256:" + "a".repeat(64);
 
 function status() {
     return {
@@ -74,6 +78,28 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     assert.throws(() => parseArgs([
         "deploy", "--image", "candidate", "--min-camera-smart-messages", "0"
     ]), /positive integer/);
+});
+
+test("applied deployment requires an immutable image before Docker changes", async (t) => {
+    const { config } = fixture(t);
+    const docker = fakeDocker(() => ({ ok: true, stdout: "", stderr: "" }));
+    let fetched = false;
+
+    assert.equal(isImmutableImageReference(CANDIDATE_IMAGE), true);
+    assert.equal(isImmutableImageReference("ghcr.io/example/vcam:grand-design"), false);
+    await assert.rejects(() => deploy(parseArgs([
+        "deploy", "--image", "ghcr.io/example/vcam:grand-design",
+        "--config", config, "--apply"
+    ]), {
+        docker,
+        fetchJson: async () => {
+            fetched = true;
+            return status();
+        }
+    }), /immutable sha256 image digest/);
+
+    assert.equal(fetched, false);
+    assert.equal(docker.calls.length, 0);
 });
 
 test("deployment acceptance can require routed and delivered smart events", async () => {
@@ -153,7 +179,7 @@ test("successful deployment preserves the old container and passes identity acce
         if (args[0] === "image") return { ok: true, stdout: "{}", stderr: "" };
     });
     const result = await deploy(parseArgs([
-        "deploy", "--image", "candidate", "--config", config,
+        "deploy", "--image", CANDIDATE_IMAGE, "--config", config,
         "--expected-cameras", "1", "--checkpoint-dir", directory, "--apply"
     ]), {
         docker,
@@ -182,7 +208,7 @@ test("deployment waits for Protect to recreate its PullPoint subscription", asyn
     let requests = 0;
     let waits = 0;
     const result = await deploy(parseArgs([
-        "deploy", "--image", "candidate", "--config", config,
+        "deploy", "--image", CANDIDATE_IMAGE, "--config", config,
         "--expected-cameras", "1", "--checkpoint-dir", directory,
         "--require-pullpoint-subscribers", "--apply"
     ]), {
@@ -217,7 +243,7 @@ test("failed candidate acceptance restores the previous container automatically"
     });
     let requests = 0;
     await assert.rejects(() => deploy(parseArgs([
-        "deploy", "--image", "candidate", "--config", config,
+        "deploy", "--image", CANDIDATE_IMAGE, "--config", config,
         "--expected-cameras", "1", "--checkpoint-dir", directory, "--apply"
     ]), {
         docker,
@@ -245,7 +271,7 @@ test("failed rollback-container rename restarts the stopped current container", 
         if (args[0] === "rename") return { ok: false, stdout: "", stderr: "rename failed" };
     });
     await assert.rejects(() => deploy(parseArgs([
-        "deploy", "--image", "candidate", "--config", config,
+        "deploy", "--image", CANDIDATE_IMAGE, "--config", config,
         "--expected-cameras", "1", "--checkpoint-dir", directory, "--apply"
     ]), {
         docker,

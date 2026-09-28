@@ -13,6 +13,10 @@ function positiveInteger(value, label) {
     return parsed;
 }
 
+function isImmutableImageReference(value) {
+    return /^(?:[^@\s]+@)?sha256:[0-9a-f]{64}$/i.test(String(value || ""));
+}
+
 function parseArgs(argv) {
     const options = {
         command: "deploy",
@@ -150,6 +154,9 @@ async function deploy(options, dependencies = {}) {
     const envFile = options.envFile ? path.resolve(options.envFile) : null;
     if (!fs.existsSync(config)) throw new Error(`candidate config does not exist: ${config}`);
     if (envFile && !fs.existsSync(envFile)) throw new Error(`environment file does not exist: ${envFile}`);
+    if (options.apply && !isImmutableImageReference(options.image)) {
+        throw new Error("applied deployments require an immutable sha256 image digest");
+    }
 
     const currentStatus = await request(options.url, options.timeoutSeconds * 1000);
     const identityManifest = buildIdentityManifest(currentStatus, options.expectedCameras);
@@ -181,6 +188,7 @@ async function deploy(options, dependencies = {}) {
         container: options.container,
         rollbackContainer,
         image: options.image,
+        immutableImage: isImmutableImageReference(options.image),
         config,
         envFile,
         expectedCameras: options.expectedCameras
@@ -278,6 +286,7 @@ if (require.main === module) main();
 module.exports = {
     createDockerExecutor,
     deploy,
+    isImmutableImageReference,
     parseArgs,
     rollback,
     timestampName,

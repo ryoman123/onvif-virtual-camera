@@ -172,7 +172,7 @@ npm run deploy:transactional -- rollback \
   --apply
 ```
 
-Use an immutable image digest for production. Candidate configs, `.env` files, and generated deployment checkpoints remain local and are ignored by Git. The tool does not modify the Protect database or the host MacVLAN configuration.
+Applied deployments require an immutable `sha256` image digest and reject mutable tags before reading production status or changing Docker state. Candidate configs, `.env` files, and generated deployment checkpoints remain local and are ignored by Git. The tool does not modify the Protect database or the host MacVLAN configuration.
 
 ### Frigate Analytics Events
 
