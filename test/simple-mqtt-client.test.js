@@ -85,3 +85,32 @@ test("built-in MQTT client connects, subscribes, and receives a Frigate message"
         await new Promise((resolve) => server.close(resolve));
     }
 });
+
+test("built-in MQTT client disconnects a half-open broker that ignores PINGREQ", { timeout: 5000 }, async () => {
+    const server = net.createServer((socket) => {
+        socket.on("data", (chunk) => {
+            if ((chunk[0] >> 4) === 1) {
+                socket.write(Buffer.from([0x20, 0x02, 0x00, 0x00]));
+            }
+            // Deliberately ignore MQTT PINGREQ packets to simulate a half-open broker.
+        });
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const client = new SimpleMqttClient("mqtt://127.0.0.1:" + server.address().port, {
+        clientId: "onvif-keepalive-test",
+        reconnectPeriod: 0,
+        connectTimeout: 2000,
+        keepalive: 1
+    });
+
+    try {
+        await once(client, "connect");
+        const [error] = await once(client, "error");
+        assert.match(error.message, /keepalive timed out waiting for PINGRESP/);
+        await once(client, "close");
+        assert.equal(client.connected, false);
+    } finally {
+        if (client.socket) await new Promise((resolve) => client.end(true, {}, resolve));
+        await new Promise((resolve) => server.close(resolve));
+    }
+});

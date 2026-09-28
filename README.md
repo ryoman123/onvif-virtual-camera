@@ -202,6 +202,8 @@ analytics:
 - `connect_timeout_ms`: Connection timeout for the MQTT broker.
 - `keepalive_seconds`: MQTT keepalive interval. Set to `0` to disable MQTT keepalive pings.
 
+The built-in client requires a matching MQTT `PINGRESP`; a broker or network path that leaves the TCP socket half-open is disconnected and sent through the normal reconnect path instead of remaining falsely healthy forever.
+
 Person, vehicle, animal, package, and motion state is normalized before publication. Overlapping detections are aggregated so one source cannot clear an ONVIF state while another contributor remains active.
 
 ### UniFi Protect third-party camera behavior

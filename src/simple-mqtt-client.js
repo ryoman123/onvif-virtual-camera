@@ -129,6 +129,7 @@ class SimpleMqttClient extends EventEmitter {
         this.reconnectTimer = null;
         this.connectTimer = null;
         this.keepaliveTimer = null;
+        this.awaitingPingResponse = false;
         this.nextPacketId = 1;
         this.pendingSubscribes = new Map();
 
@@ -140,6 +141,7 @@ class SimpleMqttClient extends EventEmitter {
 
         this.clearSocketTimers();
         this.buffer = Buffer.alloc(0);
+        this.awaitingPingResponse = false;
 
         const host = this.url.hostname;
         const port = Number(this.url.port || (this.url.protocol === "mqtts:" ? 8883 : 1883));
@@ -213,6 +215,7 @@ class SimpleMqttClient extends EventEmitter {
             }
 
             this.connected = true;
+            this.awaitingPingResponse = false;
             if (this.connectTimer) {
                 clearTimeout(this.connectTimer);
                 this.connectTimer = null;
@@ -240,6 +243,7 @@ class SimpleMqttClient extends EventEmitter {
         }
 
         if (type === 13) {
+            this.awaitingPingResponse = false;
             return;
         }
     }
@@ -295,6 +299,11 @@ class SimpleMqttClient extends EventEmitter {
 
         this.keepaliveTimer = setInterval(() => {
             if (this.connected && this.socket && !this.socket.destroyed) {
+                if (this.awaitingPingResponse) {
+                    this.socket.destroy(new Error("MQTT keepalive timed out waiting for PINGRESP"));
+                    return;
+                }
+                this.awaitingPingResponse = true;
                 this.socket.write(packet(0xc0));
             }
         }, Math.max(1000, this.options.keepalive * 500));
@@ -311,6 +320,7 @@ class SimpleMqttClient extends EventEmitter {
             clearInterval(this.keepaliveTimer);
             this.keepaliveTimer = null;
         }
+        this.awaitingPingResponse = false;
     }
 
     handleClose(socket) {
