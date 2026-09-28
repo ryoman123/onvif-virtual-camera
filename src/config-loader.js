@@ -12,6 +12,40 @@ function hasAuth(object) {
     );
 }
 
+function resolveCredential(value, label) {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+
+    if (typeof value === "string") {
+        const literal = value.trim();
+        if (!literal) throw new Error(label + " must not be empty.");
+        return literal;
+    }
+
+    if (
+        !value ||
+        typeof value !== "object" ||
+        Array.isArray(value) ||
+        Object.keys(value).length !== 1 ||
+        typeof value.env !== "string"
+    ) {
+        throw new Error(label + " must be a string or an { env: VARIABLE_NAME } reference.");
+    }
+
+    const variable = value.env.trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(variable)) {
+        throw new Error(label + ".env must be a valid environment variable name.");
+    }
+
+    const resolved = process.env[variable];
+    if (typeof resolved !== "string" || resolved.length === 0) {
+        throw new Error(label + " environment variable '" + variable + "' is not set.");
+    }
+
+    return resolved;
+}
+
 function getDefaultRuntime() {
     return {
         enable_debug_logs: false,
@@ -122,14 +156,30 @@ function loadConfig(configPath) {
             throw new Error(`Duplicate host_source name '${src.name}' found in config.`);
         }
 
+        let auth = null;
+        if (src.auth) {
+            const username = resolveCredential(
+                src.auth.username,
+                "host_source '" + src.name + "'.auth.username"
+            );
+            const password = resolveCredential(
+                src.auth.password,
+                "host_source '" + src.name + "'.auth.password"
+            );
+            if ((username && !password) || (!username && password)) {
+                throw new Error(
+                    "host_source '" + src.name +
+                    "'.auth must resolve both username and password."
+                );
+            }
+            if (username && password) auth = { username, password };
+        }
+
         sourcesByName[src.name] = {
             hostname: src.hostname,
             rtsp_port: src.rtsp_port,
             http_port: src.http_port,
-            auth: hasAuth(src) ? {
-                username: src.auth.username,
-                password: src.auth.password
-            } : null
+            auth
         };
     }
 
@@ -253,8 +303,8 @@ function normalizeAnalyticsConfig(value, cameraNames, sourcesByName) {
         throw new Error("analytics.frigate.broker is required when Frigate analytics is enabled.");
     }
 
-    const username = normalizeOptionalString(input.username, "analytics.frigate.username");
-    const password = normalizeOptionalString(input.password, "analytics.frigate.password");
+    const username = resolveCredential(input.username, "analytics.frigate.username");
+    const password = resolveCredential(input.password, "analytics.frigate.password");
     if ((username && !password) || (!username && password)) {
         throw new Error("analytics.frigate.username and password must be provided together.");
     }

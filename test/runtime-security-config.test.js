@@ -59,6 +59,37 @@ function loadYaml(yaml) {
     }
 }
 
+test("host credentials resolve from environment references and fail closed", (t) => {
+    const usernameName = "ONVIF_TEST_NVR_USERNAME";
+    const passwordName = "ONVIF_TEST_NVR_PASSWORD";
+    const oldUsername = process.env[usernameName];
+    const oldPassword = process.env[passwordName];
+    t.after(() => {
+        if (oldUsername === undefined) delete process.env[usernameName];
+        else process.env[usernameName] = oldUsername;
+        if (oldPassword === undefined) delete process.env[passwordName];
+        else process.env[passwordName] = oldPassword;
+    });
+
+    const referenced = baseConfig().replace(
+        "username: viewer\n      password: secret",
+        "username:\n        env: " + usernameName +
+        "\n      password:\n        env: " + passwordName
+    );
+
+    process.env[usernameName] = "env-viewer";
+    process.env[passwordName] = "env-secret";
+    const loaded = loadYaml(referenced);
+    assert.equal(loaded.cameras[0].auth.username, "env-viewer");
+    assert.equal(loaded.cameras[0].auth.password, "env-secret");
+
+    delete process.env[passwordName];
+    assert.throws(
+        () => loadYaml(referenced),
+        new RegExp(passwordName + ".*not set")
+    );
+});
+
 test("WS-Security defaults are audit-first and frozen", () => {
     const { runtime } = loadYaml(baseConfig());
 

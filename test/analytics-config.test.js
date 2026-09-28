@@ -81,6 +81,36 @@ analytics:
     assert.equal(config.analytics.frigate.camera_map.driveway, "VirtualCam1");
 });
 
+test("Frigate MQTT credentials resolve from environment references", (t) => {
+    const usernameName = "ONVIF_TEST_MQTT_USERNAME";
+    const passwordName = "ONVIF_TEST_MQTT_PASSWORD";
+    const oldUsername = process.env[usernameName];
+    const oldPassword = process.env[passwordName];
+    t.after(() => {
+        if (oldUsername === undefined) delete process.env[usernameName];
+        else process.env[usernameName] = oldUsername;
+        if (oldPassword === undefined) delete process.env[passwordName];
+        else process.env[passwordName] = oldPassword;
+    });
+
+    process.env[usernameName] = "mqtt-user";
+    process.env[passwordName] = "mqtt-secret";
+    const config = load(yaml(`
+analytics:
+  frigate:
+    enabled: true
+    broker: mqtt://192.0.2.20:1883
+    username:
+      env: ${usernameName}
+    password:
+      env: ${passwordName}
+    camera_map: auto
+`));
+
+    assert.equal(config.analytics.frigate.username, "mqtt-user");
+    assert.equal(config.analytics.frigate.password, "mqtt-secret");
+});
+
 test("Frigate mapping to an unknown virtual camera is rejected", () => {
     assert.throws(() => load(yaml(`
 analytics:

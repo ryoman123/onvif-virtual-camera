@@ -149,11 +149,14 @@ analytics:
     connect_timeout_ms: 30000
     keepalive_seconds: 30
     camera_map: auto
-    # username: "mqtt-user"
-    # password: "mqtt-password"
+    # username:
+    #   env: ONVIF_MQTT_USERNAME
+    # password:
+    #   env: ONVIF_MQTT_PASSWORD
 ```
 
 - `broker`: MQTT broker URL using `mqtt://` or `mqtts://`. Put credentials in the dedicated fields rather than embedding them in the URL.
+- `username` / `password`: Accept literal strings for backward compatibility or `{ env: VARIABLE_NAME }` references. Environment references are recommended so secrets remain outside `config.yml`.
 - `camera_map`: Maps Frigate camera names to configured virtual camera names. Set it to `auto` to derive stable lowercase/underscore names from every virtual camera, or provide an explicit mapping object. Unknown targets and automatic naming collisions are rejected during startup.
 - `topic_prefix`: Defaults to `frigate` and subscribes to availability, tracked-object events, and per-camera motion topics.
 - `client_id`: MQTT client identity. Use a unique value if multiple bridge instances share one broker.
@@ -240,15 +243,17 @@ host_sources:
     rtsp_port: 554
     http_port: 80
     auth:
-      username: "admin"
-      password: "password123"
+      username:
+        env: ONVIF_CAM1_USERNAME
+      password:
+        env: ONVIF_CAM1_PASSWORD
 ```
 
 - `name`: Used for later reference and should be short while avoiding special characters/spaces.
 - `hostname`: The IP address or DNS hostname of the actual video source.
 - `rtsp_port`: Port on the host for RTSP streams.
 - `http_port`: Port on the host for HTTP requests.
-- `auth`: The username and password to be used for authentication at the host. May be omitted if not required.
+- `auth`: The username and password used for the source. Each value may be a literal string for backward compatibility or an `{ env: VARIABLE_NAME }` reference. Missing or empty referenced variables fail startup before any camera is initialized.
 
 ### Virtual Cameras
 
@@ -366,12 +371,16 @@ services:
     container_name: onvif-vcam-server
     network_mode: host
     restart: unless-stopped
+    env_file:
+      - .env
     volumes:
       - ./config.yml:/config.yml:ro
 ```
 
 > [!NOTE]
 > `network_mode: host` is required because the container needs direct access to the host MacVLAN interfaces.
+
+Keep credential values in the local `.env` file referenced by Compose. The repository ignores `.env`, `config.yml`, and common secret/key formats. Variable names may safely remain in `config.yml`; their values are resolved only at startup and are omitted from diagnostics.
 
 ## Running
 

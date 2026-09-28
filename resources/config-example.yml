@@ -25,8 +25,10 @@ analytics:
     keepalive_seconds: 30
     # "auto" uses the same deterministic names as the sidecar generator.
     camera_map: auto
-    # username: "mqtt-user"
-    # password: "mqtt-password"
+    # username:
+    #   env: ONVIF_MQTT_USERNAME
+    # password:
+    #   env: ONVIF_MQTT_PASSWORD
 
   recorders:
     - name: "lorex"
@@ -50,16 +52,20 @@ host_sources:
     rtsp_port: 554
     http_port: 80
     auth:
-      username: "admin"
-      password: "password123"
+      username:
+        env: ONVIF_CAM1_USERNAME
+      password:
+        env: ONVIF_CAM1_PASSWORD
 
   - name: cam2
     hostname: 192.168.1.51
     rtsp_port: 554
     http_port: 80
     auth:
-      username: "admin"
-      password: "password123"
+      username:
+        env: ONVIF_CAM2_USERNAME
+      password:
+        env: ONVIF_CAM2_PASSWORD
 
 virtual_cameras:
   - name: "VirtualCam1"
