@@ -71,7 +71,7 @@ curl -s http://127.0.0.1:9090/status
 ```
 
 - `/healthz` is a compact readiness probe. It returns HTTP `200` when all virtual cameras are ready and every enabled analytics runtime is connected, or HTTP `503` when the bridge is degraded.
-- `/status` returns the detailed runtime snapshot: per-camera lifecycle state, interface/IP, RTSP session counts, PullPoint queue/subscription counters, Frigate MQTT health, and native recorder health.
+- `/status` returns the detailed runtime snapshot: process start time/uptime, per-camera lifecycle state, interface/IP, RTSP session counts, PullPoint queue/subscription counters, Frigate MQTT health, and native recorder health.
 - Diagnostics deliberately omit source RTSP URLs and credentials.
 - The production Docker image uses `/healthz` for its native `HEALTHCHECK`, so `docker ps` reports the container's readiness automatically.
 - If diagnostics are explicitly disabled, the Docker healthcheck treats that as intentional and exits successfully.
@@ -131,7 +131,7 @@ npm run acceptance:check -- \
 
 The analytics event minimums prove that each configured source dispatched a real event since process start. `--require-pullpoint-subscribers` proves that Protect (or another ONVIF client) has an active PullPoint on every virtual camera, while `--min-pullpoint-messages 1` proves at least one notification crossed each camera's PullPoint boundary. A recorder connection minimum of `2` proves the client established a second connection after a controlled interruption. Start the soak only after generating representative detections on every camera and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
 
-The command prints a machine-readable JSON result and exits non-zero on the first failed sample. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
+The command prints a machine-readable JSON result and exits non-zero on the first failed sample. A soak also pins the bridge process start time and requires monotonically increasing uptime, so a container/process restart cannot disappear between otherwise healthy samples. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
 
 ### Frigate Analytics Events
 

@@ -20,6 +20,8 @@ const lifecycle = Object.freeze({
 function status(overrides = {}) {
     return {
         status: "healthy",
+        startedAt: "2026-09-27T14:00:00.000Z",
+        uptimeSeconds: 3600,
         cameras: {
             total: 2,
             healthy: 2,
@@ -212,4 +214,57 @@ test("soak exits on the first degraded sample", async () => {
     assert.equal(result.passed, false);
     assert.equal(result.samples, 2);
     assert.equal(waits, 1);
+});
+
+test("soak fails if the bridge process restarts while otherwise healthy", async () => {
+    let requests = 0;
+    const result = await run({
+        url: "http://example/status",
+        expectedCameras: 2,
+        requireFrigate: false,
+        requireRecorders: [],
+        soakSeconds: 60,
+        intervalSeconds: 1,
+        timeoutMs: 100
+    }, {
+        fetchJson: async () => {
+            requests += 1;
+            return requests === 1
+                ? status()
+                : status({
+                    startedAt: "2026-09-27T15:00:00.000Z",
+                    uptimeSeconds: 1
+                });
+        },
+        delay: async () => {}
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.samples, 2);
+    assert.ok(result.failures.some((failure) => failure.includes("process restarted")));
+    assert.ok(result.failures.some((failure) => failure.includes("uptime regressed")));
+});
+
+test("soak refuses status without process continuity telemetry", async () => {
+    const current = status();
+    delete current.startedAt;
+    delete current.uptimeSeconds;
+
+    const result = await run({
+        url: "http://example/status",
+        expectedCameras: 2,
+        requireFrigate: false,
+        requireRecorders: [],
+        soakSeconds: 60,
+        intervalSeconds: 1,
+        timeoutMs: 100
+    }, {
+        fetchJson: async () => current,
+        delay: async () => {}
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.samples, 1);
+    assert.ok(result.failures.some((failure) => failure.includes("startedAt")));
+    assert.ok(result.failures.some((failure) => failure.includes("uptimeSeconds")));
 });

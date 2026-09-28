@@ -2,6 +2,7 @@
 
 const {
     evaluateAcceptance,
+    evaluateContinuity,
     fetchJson
 } = require("../src/acceptance-check");
 const fs = require("fs");
@@ -114,11 +115,26 @@ async function run(options, dependencies = {}) {
     const startedAt = Date.now();
     const deadline = startedAt + (options.soakSeconds * 1000);
     let samples = 0;
+    let previousContinuity = null;
 
     while (true) {
         samples += 1;
         const status = await request(options.url, options.timeoutMs);
-        const result = evaluateAcceptance(status, acceptanceOptions);
+        let result = evaluateAcceptance(status, acceptanceOptions);
+        if (options.soakSeconds > 0) {
+            const continuity = evaluateContinuity(status, previousContinuity);
+            previousContinuity = continuity.current;
+            if (continuity.failures.length > 0) {
+                result = {
+                    ...result,
+                    passed: false,
+                    failures: Object.freeze([
+                        ...result.failures,
+                        ...continuity.failures
+                    ])
+                };
+            }
+        }
         if (!result.passed) {
             return {
                 ...result,

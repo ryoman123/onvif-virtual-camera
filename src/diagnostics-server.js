@@ -43,7 +43,8 @@ function buildSystemHealth(options = {}) {
     const cameraManagers = options.cameraManagers || [];
     const analyticsManager = options.analyticsManager || null;
     const now = options.now || (() => Date.now());
-    const startedAt = options.startedAt || now();
+    const startedAt = options.startedAt ?? now();
+    const observedAt = now();
 
     const cameras = cameraManagers.map((manager) => manager.health());
     const healthyCameras = cameras.filter(cameraHealthy).length;
@@ -54,8 +55,9 @@ function buildSystemHealth(options = {}) {
 
     return Object.freeze({
         status: healthy ? "healthy" : "degraded",
-        timestamp: new Date(now()).toISOString(),
-        uptimeSeconds: Math.max(0, Math.floor((now() - startedAt) / 1000)),
+        timestamp: new Date(observedAt).toISOString(),
+        startedAt: new Date(startedAt).toISOString(),
+        uptimeSeconds: Math.max(0, Math.floor((observedAt - startedAt) / 1000)),
         cameras: Object.freeze({
             total: cameras.length,
             healthy: healthyCameras,

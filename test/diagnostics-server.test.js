@@ -106,6 +106,8 @@ test("system health reports healthy cameras and analytics", () => {
     });
 
     assert.equal(health.status, "healthy");
+    assert.equal(health.startedAt, "1970-01-01T00:00:01.000Z");
+    assert.equal(health.timestamp, "1970-01-01T00:00:11.000Z");
     assert.equal(health.uptimeSeconds, 10);
     assert.equal(health.cameras.total, 1);
     assert.equal(health.cameras.healthy, 1);

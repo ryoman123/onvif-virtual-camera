@@ -215,8 +215,44 @@ function fetchJson(url, timeoutMs = 5000) {
     });
 }
 
+function evaluateContinuity(status, previous = null) {
+    const failures = [];
+    const startedAt = status?.startedAt;
+    const uptimeSeconds = status?.uptimeSeconds;
+
+    if (typeof startedAt !== "string" || !Number.isFinite(Date.parse(startedAt))) {
+        failures.push("bridge startedAt is missing or invalid");
+    }
+    if (!Number.isFinite(uptimeSeconds) || uptimeSeconds < 0) {
+        failures.push("bridge uptimeSeconds is missing or invalid");
+    }
+
+    if (previous) {
+        if (startedAt !== previous.startedAt) {
+            failures.push(
+                `bridge process restarted during soak (${previous.startedAt} -> ${startedAt || "missing"})`
+            );
+        }
+        if (
+            Number.isFinite(uptimeSeconds)
+            && Number.isFinite(previous.uptimeSeconds)
+            && uptimeSeconds < previous.uptimeSeconds
+        ) {
+            failures.push(
+                `bridge uptime regressed during soak (${previous.uptimeSeconds} -> ${uptimeSeconds})`
+            );
+        }
+    }
+
+    return {
+        failures,
+        current: { startedAt, uptimeSeconds }
+    };
+}
+
 module.exports = {
     READY_LIFECYCLE,
     evaluateAcceptance,
+    evaluateContinuity,
     fetchJson
 };
