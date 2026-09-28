@@ -177,3 +177,19 @@ test("diagnostics configuration validates enable flag, host, and port", () => {
         /runtime\.diagnostics\.port/
     );
 });
+
+test("snapshot source accepts only native or HQ capture", () => {
+    const hq = loadYaml(baseConfig().replace(
+        '    snapshot_path: "/snapshot.jpg"',
+        '    snapshot_path: "/snapshot.jpg"\n    snapshot_source: hq'
+    ));
+    assert.equal(hq.cameras[0].snapshotSource, "hq");
+
+    assert.throws(
+        () => loadYaml(baseConfig().replace(
+            '    snapshot_path: "/snapshot.jpg"',
+            '    snapshot_path: "/snapshot.jpg"\n    snapshot_source: substream'
+        )),
+        /snapshot_source must be 'native' or 'hq'/
+    );
+});

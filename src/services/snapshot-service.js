@@ -1,12 +1,14 @@
 const crypto = require("crypto");
+const childProcess = require("node:child_process");
 const http = require("http");
 const https = require("https");
 const logger = require("../log-manager");
 
 class SnapshotService {
-    constructor(camera) {
+    constructor(camera, dependencies = {}) {
         this.camera = camera;
         this.snapshotUrl = new URL(camera.source.snapshotUrl);
+        this.execFile = dependencies.execFile || childProcess.execFile;
     }
 
     canHandleRequest(req) {
@@ -35,6 +37,11 @@ class SnapshotService {
     }
 
     async forwardSnapshot(res) {
+        if (this.camera.source.snapshotSource === "hq") {
+            await this.captureHqSnapshot(res);
+            return;
+        }
+
         const client = this.snapshotUrl.protocol === "https:" ? https : http;
         const baseHeaders = {
             Accept: "image/*,*/*;q=0.8"
@@ -65,6 +72,47 @@ class SnapshotService {
         }
 
         await this.pipeSnapshotResponse(upstreamRes, res);
+    }
+
+    captureHqSnapshot(res) {
+        const ffmpegPath = process.env.FFMPEG_PATH || "/usr/bin/ffmpeg";
+        const args = [
+            "-hide_banner", "-loglevel", "error",
+            "-rtsp_transport", "tcp",
+            "-i", this.camera.source.rtspUrlHq,
+            "-frames:v", "1",
+            "-an",
+            "-f", "image2pipe",
+            "-vcodec", "mjpeg",
+            "pipe:1"
+        ];
+
+        return new Promise((resolve, reject) => {
+            this.execFile(ffmpegPath, args, {
+                encoding: null,
+                timeout: 15000,
+                maxBuffer: 32 * 1024 * 1024
+            }, (error, stdout) => {
+                if (error) {
+                    reject(new Error(
+                        `HQ snapshot capture failed${error.code ? ` (exit ${error.code})` : ""}`
+                    ));
+                    return;
+                }
+
+                if (!Buffer.isBuffer(stdout) || stdout.length === 0) {
+                    reject(new Error("HQ snapshot capture returned no image"));
+                    return;
+                }
+
+                res.statusCode = 200;
+                res.setHeader("Content-Type", "image/jpeg");
+                res.setHeader("Content-Length", stdout.length);
+                this.setNoCacheHeaders(res);
+                res.end(stdout);
+                resolve();
+            });
+        });
     }
 
     getCredentials() {
@@ -109,11 +157,18 @@ class SnapshotService {
             if (contentLength) {
                 res.setHeader("Content-Length", contentLength);
             }
+            this.setNoCacheHeaders(res);
 
             upstreamRes.on("error", reject);
             upstreamRes.on("end", resolve);
             upstreamRes.pipe(res);
         });
+    }
+
+    setNoCacheHeaders(res) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        res.setHeader("Pragma", "no-cache");
+        res.setHeader("Expires", "0");
     }
 
     buildDigestAuthorizationHeader(wwwAuthenticateHeader, credentials) {

@@ -214,6 +214,7 @@ function loadConfig(configPath) {
         const snapshotPath = cam.snapshot_path.startsWith("/")
             ? cam.snapshot_path
             : `/${cam.snapshot_path}`;
+        const snapshotSource = cam.snapshot_source || "native";
 
         // Construct full URLs with optional authentication
         const authPrefix = hasAuth(source)
@@ -237,6 +238,7 @@ function loadConfig(configPath) {
             rtspPathHq,
             rtspPathLq,
             snapshotPath,
+            snapshotSource,
             rtspUrlHq,
             rtspUrlLq,
             snapshotUrl,
@@ -781,6 +783,10 @@ function validateVirtualCamera(cam) {
 
     normalizeRtspPath(cam.rtsp_path_hq, `virtual_camera '${cam.name}'.rtsp_path_hq`);
     normalizeRtspPath(cam.rtsp_path_lq, `virtual_camera '${cam.name}'.rtsp_path_lq`);
+
+    if (cam.snapshot_source !== undefined && !["native", "hq"].includes(cam.snapshot_source)) {
+        throw new Error(`virtual_camera '${cam.name}'.snapshot_source must be 'native' or 'hq'.`);
+    }
 
     if (cam.stream_hq) {
         normalizeConfiguredStream(cam.stream_hq, `virtual_camera '${cam.name}'.stream_hq`);

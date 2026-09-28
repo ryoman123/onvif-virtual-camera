@@ -83,6 +83,7 @@ test("config parsing preserves the current virtual-camera identity and stream me
 
     assert.equal(camera.identity.serialNumber, "020000000005");
     assert.equal(camera.identity.manufacturer, "VirtualCam");
+    assert.equal(camera.snapshotSource, "native");
 
     assert.deepEqual(camera.streams.hq, {
         encoding: "H265",

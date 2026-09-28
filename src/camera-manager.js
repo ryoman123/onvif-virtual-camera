@@ -129,6 +129,7 @@ class CameraManager {
                 rtspPort: this.cameraConfig.host.rtsp_port,
                 snapshotUrl: this.cameraConfig.snapshotUrl,
                 snapshotPath: this.cameraConfig.snapshotPath,
+                snapshotSource: this.cameraConfig.snapshotSource,
                 rtspUrlHq: this.cameraConfig.rtspUrlHq,
                 rtspUrlLq: this.cameraConfig.rtspUrlLq
             },

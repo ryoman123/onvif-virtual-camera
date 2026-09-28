@@ -337,6 +337,7 @@ host_source: cam1
 rtsp_path_hq: "/live1"
 rtsp_path_lq: "/live1-sub"
 snapshot_path: "/snapshot1.jpg"
+snapshot_source: "native"
 ```
 
 - `name`: Used for internal reference and logging.
@@ -348,6 +349,7 @@ snapshot_path: "/snapshot1.jpg"
 - `rtsp_path_hq`: Path to be used for the high-quality RTSP stream.
 - `rtsp_path_lq`: Path to be used for the low-quality RTSP stream.
 - `snapshot_path`: Path to be used for fetching the still image snapshot.
+- `snapshot_source`: Optional `native` (default) or `hq`. Native proxies the recorder's HTTP snapshot endpoint. `hq` captures one JPEG frame from the configured HQ RTSP stream with FFmpeg, ensuring the snapshot follows the main stream dimensions Protect uses for its resolution class. Use `hq` when a recorder serves low-resolution native snapshots and Protect repeatedly flips the camera between HD/4K classifications. This compatibility behavior follows the field finding documented by [Tony's ONVIF-RTSP-AI Proxy Server](https://github.com/BigTonyTones/Tonys-Onvf-RTSP-Server/issues/42); it is opt-in because each snapshot request briefly opens an HQ RTSP session.
 
 With optional identity fields:
 
