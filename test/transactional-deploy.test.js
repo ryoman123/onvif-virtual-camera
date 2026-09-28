@@ -60,6 +60,19 @@ function fixture(t) {
     return { directory, config };
 }
 
+function writeRollbackIdentity(directory, rollbackName) {
+    const identityPath = path.join(directory, `${rollbackName}.identities.json`);
+    fs.writeFileSync(identityPath, JSON.stringify({
+        cameras: [{
+            name: "Cam1",
+            mac: "02:00:00:00:00:01",
+            serialNumber: "SER1",
+            hardwareId: "HW1"
+        }]
+    }));
+    return identityPath;
+}
+
 test("deployment CLI is dry-run by default and requires an explicit image", () => {
     assert.throws(() => parseArgs(["deploy"]), /requires --image/);
     const options = parseArgs(["deploy", "--image", "ghcr.io/example/vcam@sha256:abc"]);
@@ -322,35 +335,55 @@ test("failed rollback-container rename restarts the stopped current container", 
     assert.ok(docker.calls.some((args) => args[0] === "start" && args[1] === "onvif-vcam-server"));
 });
 
-test("explicit rollback requires --apply before changing containers", () => {
+test("explicit rollback requires --apply before changing containers", async (t) => {
+    const { directory } = fixture(t);
+    const rollbackName = "onvif-vcam-server-rollback-20260928T091530Z";
+    const identityPath = writeRollbackIdentity(directory, rollbackName);
     const docker = fakeDocker(() => ({ ok: true, stdout: "{}", stderr: "" }));
-    const dryRun = rollback(parseArgs([
-        "rollback", "--rollback-container", "onvif-vcam-server-rollback-20260928T091530Z"
+    const dryRun = await rollback(parseArgs([
+        "rollback", "--rollback-container", rollbackName, "--checkpoint-dir", directory
     ]), { docker });
     assert.equal(dryRun.applied, false);
+    assert.equal(dryRun.identityPath, identityPath);
     assert.equal(docker.calls.length, 0);
 });
 
-test("explicit rollback preserves the replaced candidate container", () => {
+test("explicit rollback preserves the candidate and validates restored health and identity", async (t) => {
+    const { directory } = fixture(t);
+    const rollbackName = "onvif-vcam-server-rollback-20260928T091530Z";
+    writeRollbackIdentity(directory, rollbackName);
     const docker = fakeDocker((args) => {
+        if (args[0] === "inspect" && args[1] === "--format") {
+            return { ok: true, stdout: "running healthy", stderr: "" };
+        }
         if (args[0] === "inspect") {
             if (args[1]?.includes("replaced")) return { ok: false, stdout: "", stderr: "missing" };
             return { ok: true, stdout: "{}", stderr: "" };
         }
     });
-    const result = rollback(parseArgs([
-        "rollback", "--rollback-container", "onvif-vcam-server-rollback-20260928T091530Z", "--apply"
-    ]), { docker, nowDate: () => new Date("2026-09-28T10:00:00Z") });
+    const result = await rollback(parseArgs([
+        "rollback", "--rollback-container", rollbackName,
+        "--checkpoint-dir", directory, "--expected-cameras", "1", "--apply"
+    ]), {
+        docker,
+        fetchJson: async () => status(),
+        nowDate: () => new Date("2026-09-28T10:00:00Z"),
+        now: () => 0,
+        delay: async () => {}
+    });
 
     assert.equal(result.applied, true);
+    assert.equal(result.acceptance.passed, true);
     assert.equal(result.replacedContainer, "onvif-vcam-server-replaced-20260928T100000Z");
     assert.ok(docker.calls.some((args) => args[0] === "rename" && args[2] === result.replacedContainer));
     assert.equal(docker.calls.some((args) => args[0] === "rm"), false);
 });
 
-test("failed old-container startup restores the candidate and original rollback checkpoint", () => {
+test("failed old-container startup restores the candidate and original rollback checkpoint", async (t) => {
+    const { directory } = fixture(t);
     let failedStart = false;
     const rollbackName = "onvif-vcam-server-rollback-20260928T091530Z";
+    writeRollbackIdentity(directory, rollbackName);
     const docker = fakeDocker((args) => {
         if (args[0] === "inspect") {
             if (args[1]?.includes("replaced")) return { ok: false, stdout: "", stderr: "missing" };
@@ -362,10 +395,51 @@ test("failed old-container startup restores the candidate and original rollback 
         }
     });
 
-    assert.throws(() => rollback(parseArgs([
-        "rollback", "--rollback-container", rollbackName, "--apply"
+    await assert.rejects(() => rollback(parseArgs([
+        "rollback", "--rollback-container", rollbackName,
+        "--checkpoint-dir", directory, "--apply"
     ]), { docker, nowDate: () => new Date("2026-09-28T10:00:00Z") }), /candidate container restored automatically/);
 
+    assert.ok(docker.calls.some((args) => args[0] === "rename"
+        && args[1] === "onvif-vcam-server" && args[2] === rollbackName));
+    assert.equal(docker.calls.at(-1)[0], "start");
+    assert.equal(docker.calls.at(-1)[1], "onvif-vcam-server");
+});
+
+test("failed rollback acceptance restores the candidate and rollback checkpoint", async (t) => {
+    const { directory } = fixture(t);
+    const rollbackName = "onvif-vcam-server-rollback-20260928T091530Z";
+    writeRollbackIdentity(directory, rollbackName);
+    const docker = fakeDocker((args) => {
+        if (args[0] === "inspect" && args[1] === "--format") {
+            return { ok: true, stdout: "running healthy", stderr: "" };
+        }
+        if (args[0] === "inspect") {
+            if (args[1]?.includes("replaced")) return { ok: false, stdout: "", stderr: "missing" };
+            return { ok: true, stdout: "{}", stderr: "" };
+        }
+    });
+    let clock = 0;
+
+    await assert.rejects(() => rollback(parseArgs([
+        "rollback", "--rollback-container", rollbackName,
+        "--checkpoint-dir", directory, "--expected-cameras", "1", "--apply"
+    ]), {
+        docker,
+        fetchJson: async () => {
+            const value = status();
+            value.cameras.items[0].mac = "02:00:00:00:00:ff";
+            return value;
+        },
+        nowDate: () => new Date("2026-09-28T10:00:00Z"),
+        now: () => { clock += 200000; return clock; },
+        delay: async () => {}
+    }), /candidate container restored automatically/);
+
+    const recoveryRename = docker.calls.findIndex((args) => args[0] === "rename"
+        && args[1] === "onvif-vcam-server" && args[2] === rollbackName);
+    assert.ok(recoveryRename > 0);
+    assert.deepEqual(docker.calls[recoveryRename - 1], ["stop", "onvif-vcam-server"]);
     assert.ok(docker.calls.some((args) => args[0] === "rename"
         && args[1] === "onvif-vcam-server" && args[2] === rollbackName));
     assert.equal(docker.calls.at(-1)[0], "start");

@@ -166,11 +166,13 @@ npm run deploy:transactional -- deploy \
 
 Repeat the exact command with `--apply` only after reviewing the JSON plan. The helper writes a private identity checkpoint, stops and renames the exact old container instead of deleting it, launches the candidate with host networking and the supplied read-only config, then requires Docker health plus 29/29 identity and analytics acceptance. With `--require-pullpoint-subscribers`, it waits up to the configured timeout for Protect to recreate every camera subscription instead of sampling only once immediately after startup. `--min-pullpoint-messages 1` additionally proves that each camera delivered a notification, and `--max-pullpoint-idle-seconds 120` rejects a stale Protect consumer even if its subscription still exists. Any startup, health, or acceptance timeout removes the candidate and automatically restores the previous container.
 
-On success, keep the reported rollback container until live Protect checks and the soak finish. To restore it deliberately, the helper first stops and renames the candidate as a replacement checkpoint, so neither side is deleted during a manual rollback. If the old container then fails to start, both names are restored and the candidate is restarted automatically:
+On success, keep the reported rollback container and its private identity checkpoint until live Protect checks and the soak finish. To restore it deliberately, the helper first validates that checkpoint, then stops and renames the candidate as a replacement checkpoint, so neither side is deleted during a manual rollback. The restored container must pass Docker health plus the same 29/29 identity and analytics acceptance gate before rollback succeeds. If it fails to start, become healthy, or pass acceptance, both names are restored and the candidate is restarted automatically:
 
 ```bash
 npm run deploy:transactional -- rollback \
   --rollback-container onvif-vcam-server-rollback-YYYYMMDDTHHMMSSZ \
+  --checkpoint-dir ./deployment-checkpoints \
+  --expected-cameras 29 \
   --apply
 ```
 

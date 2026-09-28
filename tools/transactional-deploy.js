@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { evaluateAcceptance, fetchJson } = require("../src/acceptance-check");
 const { buildIdentityManifest } = require("../src/identity-manifest");
+const { readIdentityManifest } = require("./acceptance-check");
 const { writeManifest } = require("./capture-identity-manifest");
 
 function positiveInteger(value, label) {
@@ -104,7 +105,7 @@ function timestampName(container, now = new Date()) {
     return `${container}-rollback-${timestamp}`;
 }
 
-async function waitForHealthy(container, options, dependencies) {
+async function waitForHealthy(container, options, dependencies, label = "candidate") {
     const docker = dependencies.docker;
     const delay = dependencies.delay || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     const deadline = dependencies.now() + (options.timeoutSeconds * 1000);
@@ -114,14 +115,14 @@ async function waitForHealthy(container, options, dependencies) {
             "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}",
             container
         ]);
-        const state = requireDocker(result, "candidate health inspection");
+        const state = requireDocker(result, `${label} health inspection`);
         const [runtimeState, healthState] = state.includes(" ") ? state.split(/\s+/, 2) : ["running", state];
         if (["dead", "exited"].includes(runtimeState)) {
-            throw new Error(`candidate entered ${runtimeState} state`);
+            throw new Error(`${label} entered ${runtimeState} state`);
         }
         if (healthState === "healthy") return healthState;
-        if (healthState === "no-healthcheck") throw new Error("candidate image has no Docker healthcheck");
-        if (dependencies.now() >= deadline) throw new Error("candidate health validation timed out");
+        if (healthState === "no-healthcheck") throw new Error(`${label} image has no Docker healthcheck`);
+        if (dependencies.now() >= deadline) throw new Error(`${label} health validation timed out`);
         await delay(options.intervalSeconds * 1000);
     }
 }
@@ -240,9 +241,20 @@ async function deploy(options, dependencies = {}) {
     }
 }
 
-function rollback(options, dependencies = {}) {
+async function rollback(options, dependencies = {}) {
     const docker = dependencies.docker || createDockerExecutor();
-    if (!options.apply) return { applied: false, container: options.container, rollbackContainer: options.rollbackContainer };
+    const request = dependencies.fetchJson || fetchJson;
+    const checkpointDir = path.resolve(options.checkpointDir);
+    const identityPath = path.join(checkpointDir, `${options.rollbackContainer}.identities.json`);
+    const identityManifest = { cameras: readIdentityManifest(identityPath) };
+    if (!options.apply) {
+        return {
+            applied: false,
+            container: options.container,
+            rollbackContainer: options.rollbackContainer,
+            identityPath
+        };
+    }
     requireDocker(docker.run(["inspect", options.rollbackContainer]), "rollback container inspection");
     const replacedContainer = timestampName(options.container, dependencies.nowDate?.() || new Date())
         .replace("-rollback-", "-replaced-");
@@ -259,8 +271,29 @@ function rollback(options, dependencies = {}) {
         requireDocker(docker.run(["rename", options.rollbackContainer, options.container]), "rollback container rename");
         rollbackRenamed = true;
         requireDocker(docker.run(["start", options.container]), "rollback container start");
+        await waitForHealthy(options.container, options, {
+            docker,
+            delay: dependencies.delay,
+            now: dependencies.now || (() => Date.now())
+        }, "rollback container");
+        const acceptance = await waitForAcceptance(options, identityManifest, {
+            fetchJson: request,
+            delay: dependencies.delay,
+            now: dependencies.now || (() => Date.now())
+        });
+        return {
+            applied: true,
+            container: options.container,
+            replacedContainer: currentExists ? replacedContainer : null,
+            identityPath,
+            acceptance
+        };
     } catch (error) {
         if (rollbackRenamed) {
+            requireDocker(
+                docker.run(["stop", options.container]),
+                "failed rollback container stop"
+            );
             requireDocker(
                 docker.run(["rename", options.container, options.rollbackContainer]),
                 "failed rollback checkpoint recovery"
@@ -275,13 +308,12 @@ function rollback(options, dependencies = {}) {
         }
         throw new Error(`${error.message}; candidate container restored automatically`);
     }
-    return { applied: true, container: options.container, replacedContainer: currentExists ? replacedContainer : null };
 }
 
 async function main() {
     try {
         const options = parseArgs(process.argv.slice(2));
-        const result = options.command === "rollback" ? rollback(options) : await deploy(options);
+        const result = options.command === "rollback" ? await rollback(options) : await deploy(options);
         console.log(JSON.stringify(result, null, 2));
     } catch (error) {
         console.error(JSON.stringify({ applied: false, error: error.message }, null, 2));
