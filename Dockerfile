@@ -1,7 +1,7 @@
 # -------------------------
 # Stage 1: Base runtime
 # -------------------------
-FROM node:20-alpine AS base
+FROM node:24-alpine AS base
 
 WORKDIR /app
 COPY package*.json ./
