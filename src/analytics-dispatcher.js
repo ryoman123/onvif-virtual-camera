@@ -5,10 +5,12 @@ const {
 } = require("./analytics-event");
 
 class AnalyticsDispatcher extends EventEmitter {
-    constructor() {
+    constructor(options = {}) {
         super();
         this.targets = new Map();
+        this.targetStats = new Map();
         this.activeContributors = new Map();
+        this.now = options.now || (() => Date.now());
     }
 
     registerTarget(cameraName, target) {
@@ -24,6 +26,12 @@ class AnalyticsDispatcher extends EventEmitter {
         }
 
         this.targets.set(name, target);
+        if (!this.targetStats.has(name)) {
+            this.targetStats.set(name, {
+                eventsDispatched: 0,
+                lastEventAt: null
+            });
+        }
     }
 
     unregisterTarget(cameraName) {
@@ -35,6 +43,7 @@ class AnalyticsDispatcher extends EventEmitter {
             }
         }
 
+        this.targetStats.delete(name);
         return this.targets.delete(name);
     }
 
@@ -112,12 +121,26 @@ class AnalyticsDispatcher extends EventEmitter {
         });
         const published = target.eventBus.publish(onvif);
 
+        if (published) {
+            const stats = this.targetStats.get(analytics.camera);
+            if (stats) {
+                stats.eventsDispatched += 1;
+                stats.lastEventAt = new Date(this.now()).toISOString();
+            }
+        }
+
         this.emit("published", {
             analytics,
             onvif: published
         });
 
         return published;
+    }
+
+    health() {
+        return Object.freeze([...this.targetStats.entries()].map(([camera, stats]) => (
+            Object.freeze({ camera, ...stats })
+        )));
     }
 }
 

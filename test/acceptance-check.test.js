@@ -33,6 +33,10 @@ function status(overrides = {}) {
         },
         analytics: {
             targets: ["Cam1", "Cam2"],
+            routing: [
+                { camera: "Cam1", eventsDispatched: 2, lastEventAt: "2026-09-27T14:50:00.000Z" },
+                { camera: "Cam2", eventsDispatched: 1, lastEventAt: "2026-09-27T14:55:00.000Z" }
+            ],
             frigate: { state: "connected", available: true, eventsDispatched: 3 },
             recorders: [{
                 name: "lorex",
@@ -54,6 +58,7 @@ test("acceptance validates camera identities and required analytics", () => {
         requireFrigate: true,
         requireRecorders: ["lorex"],
         minFrigateEvents: 3,
+        minCameraAnalyticsEvents: 1,
         minRecorderEvents: { lorex: 4 },
         minRecorderConnections: { lorex: 2 },
         requirePullPointSubscribers: true,
@@ -62,6 +67,24 @@ test("acceptance validates camera identities and required analytics", () => {
     });
     assert.equal(result.passed, true);
     assert.equal(result.cameras.found, 2);
+});
+
+test("acceptance requires routed analytics evidence from every camera", () => {
+    const broken = status();
+    broken.analytics.routing[1] = {
+        camera: "Cam2",
+        eventsDispatched: 0,
+        lastEventAt: null
+    };
+
+    const result = evaluateAcceptance(broken, {
+        minCameraAnalyticsEvents: 1
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => (
+        failure.includes("Cam2: received 0 routed analytics event")
+    )));
 });
 
 test("acceptance reports identity, event-delivery and reconnect evidence failures", () => {
@@ -204,6 +227,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         "--require-recorder", "lorex",
         "--require-recorder", "nvr69",
         "--require-pullpoint-subscribers",
+        "--min-camera-analytics-events", "1",
         "--min-pullpoint-messages", "1",
         "--max-pullpoint-idle-seconds", "120",
         "--soak-seconds", "3600",
@@ -214,6 +238,7 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         requireFrigate: true,
         requireRecorders: ["lorex", "nvr69"],
         identityManifest: null,
+        minCameraAnalyticsEvents: 1,
         minFrigateEvents: undefined,
         minRecorderEvents: {},
         minRecorderConnections: {},

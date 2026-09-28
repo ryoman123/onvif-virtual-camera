@@ -74,6 +74,7 @@ test("runtime manager wires Frigate MQTT detections into a live camera event bus
         assert.equal(messages[0].topic, TOPICS.PERSON);
         assert.equal(messages[0].data.State, true);
         assert.equal(runtime.health().frigate.eventsDispatched, 1);
+        assert.equal(runtime.health().routing[0].eventsDispatched, 1);
     } finally {
         await runtime.stop();
     }
@@ -167,6 +168,7 @@ test("runtime manager wires native recorder events into the live camera bus", as
         assert.equal(messages[0].topic, TOPICS.VEHICLE);
         assert.equal(messages[0].data.State, true);
         assert.equal(manager.health().recorders[0].runtime.eventsDispatched, 1);
+        assert.equal(manager.health().routing[0].eventsDispatched, 1);
     } finally {
         await manager.stop();
     }

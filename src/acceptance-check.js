@@ -127,6 +127,21 @@ function evaluateAcceptance(status, options = {}) {
         }
     }
 
+    if (Number.isInteger(options.minCameraAnalyticsEvents)) {
+        const routing = new Map(
+            (analytics?.routing || []).map((entry) => [entry.camera, entry])
+        );
+        for (const name of names) {
+            const dispatched = routing.get(name)?.eventsDispatched ?? 0;
+            if (dispatched < options.minCameraAnalyticsEvents) {
+                failures.push(
+                    `${name}: received ${dispatched} routed analytics event(s), ` +
+                    `expected at least ${options.minCameraAnalyticsEvents}`
+                );
+            }
+        }
+    }
+
     if (options.requireFrigate) {
         if (!analytics?.frigate) {
             failures.push("Frigate analytics is not configured");

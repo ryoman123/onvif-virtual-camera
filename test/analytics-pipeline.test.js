@@ -47,6 +47,34 @@ test("Frigate MQTT events reach the mapped virtual camera ONVIF bus", () => {
         pulled.messages[1].source.VideoSourceConfigurationToken,
         "video_source_config_hq_virtual_cam_1"
     );
+    assert.equal(dispatcher.health()[0].eventsDispatched, 2);
+    assert.match(dispatcher.health()[0].lastEventAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test("dispatcher reports routed event evidence separately for every camera", () => {
+    const dispatcher = new AnalyticsDispatcher({
+        now: () => Date.parse("2026-09-28T12:00:00.000Z")
+    });
+    const firstBus = new EventBus({ topics: DEFAULT_TOPICS });
+    const secondBus = new EventBus({ topics: DEFAULT_TOPICS });
+
+    dispatcher.registerTarget("VirtualCam1", { eventBus: firstBus });
+    dispatcher.registerTarget("VirtualCam2", { eventBus: secondBus });
+    dispatcher.dispatch({
+        source: "frigate",
+        camera: "VirtualCam1",
+        type: "motion",
+        active: true
+    });
+
+    assert.deepEqual(dispatcher.health(), [
+        {
+            camera: "VirtualCam1",
+            eventsDispatched: 1,
+            lastEventAt: "2026-09-28T12:00:00.000Z"
+        },
+        { camera: "VirtualCam2", eventsDispatched: 0, lastEventAt: null }
+    ]);
 });
 
 test("dispatcher resolves live target providers and drops unknown cameras safely", () => {

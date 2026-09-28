@@ -22,6 +22,7 @@ function parseArgs(argv) {
         requireFrigate: false,
         requireRecorders: [],
         identityManifest: null,
+        minCameraAnalyticsEvents: undefined,
         minFrigateEvents: undefined,
         minRecorderEvents: {},
         minRecorderConnections: {},
@@ -47,6 +48,9 @@ function parseArgs(argv) {
         } else if (arg === "--require-frigate") options.requireFrigate = true;
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
         else if (arg === "--identity-manifest") options.identityManifest = next();
+        else if (arg === "--min-camera-analytics-events") {
+            options.minCameraAnalyticsEvents = parsePositiveInteger(next(), arg);
+        }
         else if (arg === "--min-frigate-events") {
             options.minFrigateEvents = parsePositiveInteger(next(), arg, true);
         } else if (arg === "--min-recorder-events") {

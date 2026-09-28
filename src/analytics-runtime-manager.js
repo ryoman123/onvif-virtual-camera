@@ -190,7 +190,8 @@ class AnalyticsRuntimeManager {
                 client: entry.client.health(),
                 runtime: entry.runtime.health()
             })),
-            targets: [...this.registeredTargets]
+            targets: [...this.registeredTargets],
+            routing: this.dispatcher.health()
         });
     }
 }
