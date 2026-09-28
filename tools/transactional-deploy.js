@@ -24,6 +24,7 @@ function parseArgs(argv) {
         expectedCameras: 29,
         requireFrigate: false,
         requireRecorders: [],
+        requirePullPointSubscribers: false,
         checkpointDir: "deployment-checkpoints",
         timeoutSeconds: 180,
         intervalSeconds: 2,
@@ -47,6 +48,7 @@ function parseArgs(argv) {
         else if (arg === "--expected-cameras") options.expectedCameras = positiveInteger(next(), arg);
         else if (arg === "--require-frigate") options.requireFrigate = true;
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
+        else if (arg === "--require-pullpoint-subscribers") options.requirePullPointSubscribers = true;
         else if (arg === "--checkpoint-dir") options.checkpointDir = next();
         else if (arg === "--timeout-seconds") options.timeoutSeconds = positiveInteger(next(), arg);
         else if (arg === "--interval-seconds") options.intervalSeconds = positiveInteger(next(), arg);
@@ -95,14 +97,39 @@ async function waitForHealthy(container, options, dependencies) {
     while (true) {
         const result = docker.run([
             "inspect", "--format",
-            "{{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}",
+            "{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}no-healthcheck{{end}}",
             container
         ]);
         const state = requireDocker(result, "candidate health inspection");
-        if (state === "healthy") return state;
-        if (state === "no-healthcheck") throw new Error("candidate image has no Docker healthcheck");
-        if (["dead", "exited"].includes(state)) throw new Error(`candidate entered ${state} state`);
+        const [runtimeState, healthState] = state.includes(" ") ? state.split(/\s+/, 2) : ["running", state];
+        if (["dead", "exited"].includes(runtimeState)) {
+            throw new Error(`candidate entered ${runtimeState} state`);
+        }
+        if (healthState === "healthy") return healthState;
+        if (healthState === "no-healthcheck") throw new Error("candidate image has no Docker healthcheck");
         if (dependencies.now() >= deadline) throw new Error("candidate health validation timed out");
+        await delay(options.intervalSeconds * 1000);
+    }
+}
+
+async function waitForAcceptance(options, identityManifest, dependencies) {
+    const request = dependencies.fetchJson;
+    const delay = dependencies.delay || ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    const deadline = dependencies.now() + (options.timeoutSeconds * 1000);
+    let lastResult;
+    while (true) {
+        const status = await request(options.url, options.timeoutSeconds * 1000);
+        lastResult = evaluateAcceptance(status, {
+            expectedCameras: options.expectedCameras,
+            expectedIdentities: identityManifest.cameras,
+            requireFrigate: options.requireFrigate,
+            requireRecorders: options.requireRecorders,
+            requirePullPointSubscribers: options.requirePullPointSubscribers
+        });
+        if (lastResult.passed) return lastResult;
+        if (dependencies.now() >= deadline) {
+            throw new Error(`candidate acceptance timed out: ${lastResult.failures.join("; ")}`);
+        }
         await delay(options.intervalSeconds * 1000);
     }
 }
@@ -170,16 +197,11 @@ async function deploy(options, dependencies = {}) {
         requireDocker(docker.run(runArgs), "candidate container start");
         await waitForHealthy(options.container, options, { docker, delay: dependencies.delay, now });
 
-        const candidateStatus = await request(options.url, options.timeoutSeconds * 1000);
-        const acceptance = evaluateAcceptance(candidateStatus, {
-            expectedCameras: options.expectedCameras,
-            expectedIdentities: identityManifest.cameras,
-            requireFrigate: options.requireFrigate,
-            requireRecorders: options.requireRecorders
+        const acceptance = await waitForAcceptance(options, identityManifest, {
+            fetchJson: request,
+            delay: dependencies.delay,
+            now
         });
-        if (!acceptance.passed) {
-            throw new Error(`candidate acceptance failed: ${acceptance.failures.join("; ")}`);
-        }
         return { applied: true, plan, identityPath, acceptance };
     } catch (error) {
         if (oldRenamed) {
@@ -210,15 +232,26 @@ function rollback(options, dependencies = {}) {
         requireDocker(docker.run(["stop", options.container]), "candidate container stop");
         requireDocker(docker.run(["rename", options.container, replacedContainer]), "candidate container checkpoint");
     }
+    let rollbackRenamed = false;
     try {
         requireDocker(docker.run(["rename", options.rollbackContainer, options.container]), "rollback container rename");
+        rollbackRenamed = true;
         requireDocker(docker.run(["start", options.container]), "rollback container start");
     } catch (error) {
-        if (currentExists) {
-            docker.run(["rename", replacedContainer, options.container]);
-            docker.run(["start", options.container]);
+        if (rollbackRenamed) {
+            requireDocker(
+                docker.run(["rename", options.container, options.rollbackContainer]),
+                "failed rollback checkpoint recovery"
+            );
         }
-        throw error;
+        if (currentExists) {
+            requireDocker(
+                docker.run(["rename", replacedContainer, options.container]),
+                "candidate checkpoint recovery"
+            );
+            requireDocker(docker.run(["start", options.container]), "candidate restart recovery");
+        }
+        throw new Error(`${error.message}; candidate container restored automatically`);
     }
     return { applied: true, container: options.container, replacedContainer: currentExists ? replacedContainer : null };
 }
@@ -236,4 +269,12 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { createDockerExecutor, deploy, parseArgs, rollback, timestampName, waitForHealthy };
+module.exports = {
+    createDockerExecutor,
+    deploy,
+    parseArgs,
+    rollback,
+    timestampName,
+    waitForAcceptance,
+    waitForHealthy
+};

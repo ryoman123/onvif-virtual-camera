@@ -4,7 +4,13 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 
-const { deploy, parseArgs, rollback, timestampName } = require("../tools/transactional-deploy");
+const {
+    deploy,
+    parseArgs,
+    rollback,
+    timestampName,
+    waitForHealthy
+} = require("../tools/transactional-deploy");
 
 function status() {
     return {
@@ -55,6 +61,9 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     assert.equal(options.apply, false);
     assert.equal(options.expectedCameras, 29);
     assert.equal(options.container, "onvif-vcam-server");
+    assert.equal(parseArgs([
+        "deploy", "--image", "candidate", "--require-pullpoint-subscribers"
+    ]).requirePullPointSubscribers, true);
 });
 
 test("rollback names are deterministic and Docker-safe", () => {
@@ -62,6 +71,18 @@ test("rollback names are deterministic and Docker-safe", () => {
         timestampName("onvif-vcam-server", new Date("2026-09-28T09:15:30.123Z")),
         "onvif-vcam-server-rollback-20260928T091530Z"
     );
+});
+
+test("health wait fails immediately when the candidate exits", async () => {
+    const docker = fakeDocker(() => ({ ok: true, stdout: "exited unhealthy", stderr: "" }));
+    await assert.rejects(() => waitForHealthy("candidate", {
+        timeoutSeconds: 180,
+        intervalSeconds: 2
+    }, {
+        docker,
+        now: () => 0,
+        delay: async () => {}
+    }), /candidate entered exited state/);
 });
 
 test("dry-run validates the live identity without stopping the container", async (t) => {
@@ -106,6 +127,39 @@ test("successful deployment preserves the old container and passes identity acce
     assert.equal(docker.calls.some((args) => args[0] === "rm"), false);
 });
 
+test("deployment waits for Protect to recreate its PullPoint subscription", async (t) => {
+    const { directory, config } = fixture(t);
+    const docker = fakeDocker((args) => {
+        if (args[0] === "inspect" && args[1] === "--format") {
+            return { ok: true, stdout: args[2].includes("Health") ? "healthy" : "true", stderr: "" };
+        }
+        if (args[0] === "inspect") return { ok: false, stdout: "", stderr: "missing" };
+        if (args[0] === "image") return { ok: true, stdout: "{}", stderr: "" };
+    });
+    let requests = 0;
+    let waits = 0;
+    const result = await deploy(parseArgs([
+        "deploy", "--image", "candidate", "--config", config,
+        "--expected-cameras", "1", "--checkpoint-dir", directory,
+        "--require-pullpoint-subscribers", "--apply"
+    ]), {
+        docker,
+        fetchJson: async () => {
+            requests += 1;
+            const value = status();
+            value.cameras.items[0].events = { subscriptions: requests >= 3 ? 1 : 0 };
+            return value;
+        },
+        nowDate: () => new Date("2026-09-28T09:15:30Z"),
+        now: () => 0,
+        delay: async () => { waits += 1; }
+    });
+
+    assert.equal(result.applied, true);
+    assert.equal(requests, 3);
+    assert.equal(waits, 1);
+});
+
 test("failed candidate acceptance restores the previous container automatically", async (t) => {
     const { directory, config } = fixture(t);
     const docker = fakeDocker((args) => {
@@ -131,7 +185,7 @@ test("failed candidate acceptance restores the previous container automatically"
             return value;
         },
         nowDate: () => new Date("2026-09-28T09:15:30Z"),
-        now: () => 0,
+        now: (() => { let clock = 0; return () => { clock += 200000; return clock; }; })(),
         delay: async () => {}
     }), /previous container restored automatically/);
 
@@ -182,4 +236,28 @@ test("explicit rollback preserves the replaced candidate container", () => {
     assert.equal(result.replacedContainer, "onvif-vcam-server-replaced-20260928T100000Z");
     assert.ok(docker.calls.some((args) => args[0] === "rename" && args[2] === result.replacedContainer));
     assert.equal(docker.calls.some((args) => args[0] === "rm"), false);
+});
+
+test("failed old-container startup restores the candidate and original rollback checkpoint", () => {
+    let failedStart = false;
+    const rollbackName = "onvif-vcam-server-rollback-20260928T091530Z";
+    const docker = fakeDocker((args) => {
+        if (args[0] === "inspect") {
+            if (args[1]?.includes("replaced")) return { ok: false, stdout: "", stderr: "missing" };
+            return { ok: true, stdout: "{}", stderr: "" };
+        }
+        if (args[0] === "start" && args[1] === "onvif-vcam-server" && !failedStart) {
+            failedStart = true;
+            return { ok: false, stdout: "", stderr: "old container failed" };
+        }
+    });
+
+    assert.throws(() => rollback(parseArgs([
+        "rollback", "--rollback-container", rollbackName, "--apply"
+    ]), { docker, nowDate: () => new Date("2026-09-28T10:00:00Z") }), /candidate container restored automatically/);
+
+    assert.ok(docker.calls.some((args) => args[0] === "rename"
+        && args[1] === "onvif-vcam-server" && args[2] === rollbackName));
+    assert.equal(docker.calls.at(-1)[0], "start");
+    assert.equal(docker.calls.at(-1)[1], "onvif-vcam-server");
 });
