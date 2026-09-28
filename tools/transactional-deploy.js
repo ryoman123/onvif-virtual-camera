@@ -29,6 +29,8 @@ function parseArgs(argv) {
         requireFrigate: false,
         requireRecorders: [],
         requirePullPointSubscribers: false,
+        minPullPointMessages: undefined,
+        maxPullPointIdleSeconds: undefined,
         minCameraAnalyticsEvents: undefined,
         minCameraSmartMessages: undefined,
         checkpointDir: "deployment-checkpoints",
@@ -55,6 +57,10 @@ function parseArgs(argv) {
         else if (arg === "--require-frigate") options.requireFrigate = true;
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
         else if (arg === "--require-pullpoint-subscribers") options.requirePullPointSubscribers = true;
+        else if (arg === "--min-pullpoint-messages") options.minPullPointMessages = positiveInteger(next(), arg);
+        else if (arg === "--max-pullpoint-idle-seconds") {
+            options.maxPullPointIdleSeconds = positiveInteger(next(), arg);
+        }
         else if (arg === "--min-camera-analytics-events") options.minCameraAnalyticsEvents = positiveInteger(next(), arg);
         else if (arg === "--min-camera-smart-messages") options.minCameraSmartMessages = positiveInteger(next(), arg);
         else if (arg === "--checkpoint-dir") options.checkpointDir = next();
@@ -133,6 +139,8 @@ async function waitForAcceptance(options, identityManifest, dependencies) {
             requireFrigate: options.requireFrigate,
             requireRecorders: options.requireRecorders,
             requirePullPointSubscribers: options.requirePullPointSubscribers,
+            minPullPointMessages: options.minPullPointMessages,
+            maxPullPointIdleSeconds: options.maxPullPointIdleSeconds,
             minCameraAnalyticsEvents: options.minCameraAnalyticsEvents,
             minCameraSmartMessages: options.minCameraSmartMessages
         });

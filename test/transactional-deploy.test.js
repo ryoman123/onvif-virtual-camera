@@ -69,14 +69,21 @@ test("deployment CLI is dry-run by default and requires an explicit image", () =
     const gated = parseArgs([
         "deploy", "--image", "candidate",
         "--require-pullpoint-subscribers",
+        "--min-pullpoint-messages", "1",
+        "--max-pullpoint-idle-seconds", "120",
         "--min-camera-analytics-events", "1",
         "--min-camera-smart-messages", "1"
     ]);
     assert.equal(gated.requirePullPointSubscribers, true);
+    assert.equal(gated.minPullPointMessages, 1);
+    assert.equal(gated.maxPullPointIdleSeconds, 120);
     assert.equal(gated.minCameraAnalyticsEvents, 1);
     assert.equal(gated.minCameraSmartMessages, 1);
     assert.throws(() => parseArgs([
         "deploy", "--image", "candidate", "--min-camera-smart-messages", "0"
+    ]), /positive integer/);
+    assert.throws(() => parseArgs([
+        "deploy", "--image", "candidate", "--max-pullpoint-idle-seconds", "0"
     ]), /positive integer/);
 });
 
@@ -133,6 +140,40 @@ test("deployment acceptance can require routed and delivered smart events", asyn
     });
 
     assert.equal(result.passed, true);
+});
+
+test("deployment acceptance rejects stale or undelivered PullPoint consumers", async () => {
+    const current = status();
+    current.timestamp = "2026-09-28T18:00:00.000Z";
+    current.cameras.items[0].events = {
+        subscriptions: 1,
+        messagesDelivered: 0,
+        lastPullRequestAt: "2026-09-28T17:50:00.000Z"
+    };
+    let clock = 0;
+
+    await assert.rejects(() => waitForAcceptance({
+        expectedCameras: 1,
+        requireFrigate: false,
+        requireRecorders: [],
+        requirePullPointSubscribers: true,
+        minPullPointMessages: 1,
+        maxPullPointIdleSeconds: 120,
+        url: "http://example/status",
+        timeoutSeconds: 1,
+        intervalSeconds: 1
+    }, {
+        cameras: [{
+            name: "Cam1",
+            mac: "02:00:00:00:00:01",
+            serialNumber: "SER1",
+            hardwareId: "HW1"
+        }]
+    }, {
+        fetchJson: async () => current,
+        now: () => { clock += 1000; return clock; },
+        delay: async () => {}
+    }), /delivered 0 PullPoint message.*consumer idle for 600s/);
 });
 
 test("rollback names are deterministic and Docker-safe", () => {
