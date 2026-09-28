@@ -33,6 +33,11 @@ class CameraManager {
 
         return Object.freeze({
             name: this.cameraConfig.name,
+            mac: this.cameraConfig.mac,
+            identity: Object.freeze({
+                serialNumber: this.cameraConfig.identity?.serialNumber || null,
+                hardwareId: this.cameraConfig.identity?.hardwareId || null
+            }),
             state,
             startedAt: this.startedAt,
             restartCount: this.restartCount,

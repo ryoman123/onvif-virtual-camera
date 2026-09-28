@@ -4,6 +4,7 @@ const {
     evaluateAcceptance,
     fetchJson
 } = require("../src/acceptance-check");
+const fs = require("fs");
 
 function parsePositiveInteger(value, label, allowZero = false) {
     const parsed = Number(value);
@@ -19,6 +20,10 @@ function parseArgs(argv) {
         expectedCameras: undefined,
         requireFrigate: false,
         requireRecorders: [],
+        identityManifest: null,
+        minFrigateEvents: undefined,
+        minRecorderEvents: {},
+        minRecorderConnections: {},
         soakSeconds: 0,
         intervalSeconds: 30,
         timeoutMs: 5000
@@ -37,7 +42,16 @@ function parseArgs(argv) {
             options.expectedCameras = parsePositiveInteger(next(), arg);
         } else if (arg === "--require-frigate") options.requireFrigate = true;
         else if (arg === "--require-recorder") options.requireRecorders.push(next());
-        else if (arg === "--soak-seconds") {
+        else if (arg === "--identity-manifest") options.identityManifest = next();
+        else if (arg === "--min-frigate-events") {
+            options.minFrigateEvents = parsePositiveInteger(next(), arg, true);
+        } else if (arg === "--min-recorder-events") {
+            const [name, value] = parseNamedMinimum(next(), arg);
+            options.minRecorderEvents[name] = value;
+        } else if (arg === "--min-recorder-connections") {
+            const [name, value] = parseNamedMinimum(next(), arg);
+            options.minRecorderConnections[name] = value;
+        } else if (arg === "--soak-seconds") {
             options.soakSeconds = parsePositiveInteger(next(), arg, true);
         } else if (arg === "--interval-seconds") {
             options.intervalSeconds = parsePositiveInteger(next(), arg);
@@ -51,6 +65,36 @@ function parseArgs(argv) {
     return options;
 }
 
+function parseNamedMinimum(value, label) {
+    const separator = value.lastIndexOf("=");
+    if (separator <= 0) throw new Error(`${label} must use name=minimum`);
+    const name = value.slice(0, separator).trim();
+    if (!name) throw new Error(`${label} must include a name`);
+    return [name, parsePositiveInteger(value.slice(separator + 1), label, true)];
+}
+
+function readIdentityManifest(filePath) {
+    let parsed;
+    try {
+        parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    } catch (error) {
+        throw new Error(`unable to read identity manifest: ${error.message}`);
+    }
+    const cameras = Array.isArray(parsed) ? parsed : parsed?.cameras;
+    if (!Array.isArray(cameras) || cameras.length === 0) {
+        throw new Error("identity manifest must contain a non-empty cameras array");
+    }
+    const required = ["name", "mac", "serialNumber", "hardwareId"];
+    for (const [index, camera] of cameras.entries()) {
+        for (const field of required) {
+            if (typeof camera?.[field] !== "string" || !camera[field].trim()) {
+                throw new Error(`identity manifest camera ${index} is missing ${field}`);
+            }
+        }
+    }
+    return cameras;
+}
+
 function delay(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -58,6 +102,9 @@ function delay(ms) {
 async function run(options, dependencies = {}) {
     const request = dependencies.fetchJson || fetchJson;
     const wait = dependencies.delay || delay;
+    const expectedIdentities = options.expectedIdentities
+        || (options.identityManifest ? readIdentityManifest(options.identityManifest) : undefined);
+    const acceptanceOptions = { ...options, expectedIdentities };
     const startedAt = Date.now();
     const deadline = startedAt + (options.soakSeconds * 1000);
     let samples = 0;
@@ -65,7 +112,7 @@ async function run(options, dependencies = {}) {
     while (true) {
         samples += 1;
         const status = await request(options.url, options.timeoutMs);
-        const result = evaluateAcceptance(status, options);
+        const result = evaluateAcceptance(status, acceptanceOptions);
         if (!result.passed) {
             return {
                 ...result,
@@ -106,4 +153,4 @@ if (require.main === module) {
     main();
 }
 
-module.exports = { parseArgs, run };
+module.exports = { parseArgs, parseNamedMinimum, readIdentityManifest, run };

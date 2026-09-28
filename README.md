@@ -80,7 +80,7 @@ Binding diagnostics to a non-loopback address makes the unauthenticated status e
 
 ### Field Acceptance and Soak Test
 
-The acceptance checker turns the detailed status endpoint into a repeatable deployment gate. It verifies the exact camera count, unique identities, every lifecycle stage, live IP/interface bindings, analytics-target coverage, and connected enabled analytics runtimes.
+The acceptance checker turns the detailed status endpoint into a repeatable deployment gate. It verifies the exact camera count, unique identities, every lifecycle stage, live IP/interface bindings, analytics-target coverage, and connected enabled analytics runtimes. It can also pin the Protect-facing camera identities and require evidence of real analytics delivery and reconnect recovery.
 
 For the 29-camera deployment with Frigate and both recorders:
 
@@ -89,7 +89,23 @@ npm run acceptance:check -- \
   --expected-cameras 29 \
   --require-frigate \
   --require-recorder lorex \
-  --require-recorder nvr69
+  --require-recorder nvr69 \
+  --identity-manifest ./camera-identities.json
+```
+
+The identity manifest is deliberately separate from `config.yml`, contains no credentials, and should be captured from the last trusted deployment. It prevents a same-count replacement from silently changing the MAC-derived WS-Discovery identity or ONVIF serial/hardware identity Protect adopted:
+
+```json
+{
+  "cameras": [
+    {
+      "name": "Lorex 1",
+      "mac": "02:00:00:00:00:01",
+      "serialNumber": "020000000001",
+      "hardwareId": "VirtualCam-020000000001"
+    }
+  ]
+}
 ```
 
 Run the same assertions continuously for a soak period:
@@ -100,11 +116,19 @@ npm run acceptance:check -- \
   --require-frigate \
   --require-recorder lorex \
   --require-recorder nvr69 \
+  --identity-manifest ./camera-identities.json \
+  --min-frigate-events 1 \
+  --min-recorder-events lorex=1 \
+  --min-recorder-events nvr69=1 \
+  --min-recorder-connections lorex=2 \
+  --min-recorder-connections nvr69=2 \
   --soak-seconds 43200 \
   --interval-seconds 30
 ```
 
-The command prints a machine-readable JSON result and exits non-zero on the first failed sample. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, the real recorder mappings, observed event delivery, restart/reconnect exercises, and a completed soak.
+The event minimums prove that each configured path dispatched a real event since process start. A connection minimum of `2` proves the recorder client established a second connection after a controlled interruption. Start the soak only after generating representative Frigate and recorder detections and completing the interruption/recovery exercise; the counters are cumulative for the current bridge process.
+
+The command prints a machine-readable JSON result and exits non-zero on the first failed sample. Run it inside the host-networked bridge container when diagnostics uses its default loopback binding. A successful code/CI result does not replace this live acceptance gate: production acceptance additionally requires 29/29 healthy cameras, confirmation in the real Protect UI, and a completed soak.
 
 ### Frigate Analytics Events
 

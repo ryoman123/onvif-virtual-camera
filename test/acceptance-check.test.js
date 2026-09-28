@@ -1,8 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 
 const { evaluateAcceptance } = require("../src/acceptance-check");
-const { parseArgs, run } = require("../tools/acceptance-check");
+const { parseArgs, parseNamedMinimum, readIdentityManifest, run } = require("../tools/acceptance-check");
 
 const lifecycle = Object.freeze({
     configLoaded: true,
@@ -21,17 +24,17 @@ function status(overrides = {}) {
             total: 2,
             healthy: 2,
             items: [
-                { name: "Cam1", state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle },
-                { name: "Cam2", state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle }
+                { name: "Cam1", mac: "02:00:00:00:00:01", identity: { serialNumber: "SER1", hardwareId: "HW1" }, state: "running", ip: "192.0.2.1", interface: "vcam-1", lifecycle },
+                { name: "Cam2", mac: "02:00:00:00:00:02", identity: { serialNumber: "SER2", hardwareId: "HW2" }, state: "running", ip: "192.0.2.2", interface: "vcam-2", lifecycle }
             ]
         },
         analytics: {
             targets: ["Cam1", "Cam2"],
-            frigate: { state: "connected", available: true },
+            frigate: { state: "connected", available: true, eventsDispatched: 3 },
             recorders: [{
                 name: "lorex",
-                client: { state: "connected" },
-                runtime: { state: "connected" }
+                client: { state: "connected", connections: 2 },
+                runtime: { state: "connected", eventsDispatched: 4 }
             }]
         },
         ...overrides
@@ -41,11 +44,67 @@ function status(overrides = {}) {
 test("acceptance validates camera identities and required analytics", () => {
     const result = evaluateAcceptance(status(), {
         expectedCameras: 2,
+        expectedIdentities: [
+            { name: "Cam1", mac: "02:00:00:00:00:01", serialNumber: "SER1", hardwareId: "HW1" },
+            { name: "Cam2", mac: "02:00:00:00:00:02", serialNumber: "SER2", hardwareId: "HW2" }
+        ],
         requireFrigate: true,
-        requireRecorders: ["lorex"]
+        requireRecorders: ["lorex"],
+        minFrigateEvents: 3,
+        minRecorderEvents: { lorex: 4 },
+        minRecorderConnections: { lorex: 2 }
     });
     assert.equal(result.passed, true);
     assert.equal(result.cameras.found, 2);
+});
+
+test("acceptance reports identity, event-delivery and reconnect evidence failures", () => {
+    const result = evaluateAcceptance(status(), {
+        expectedIdentities: [{
+            name: "Cam1",
+            mac: "02:00:00:00:00:ff",
+            serialNumber: "SER1",
+            hardwareId: "HW1"
+        }],
+        minFrigateEvents: 4,
+        minRecorderEvents: { lorex: 5 },
+        minRecorderConnections: { lorex: 3 }
+    });
+
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => failure.includes("identity.mac")));
+    assert.ok(result.failures.some((failure) => failure.includes("Frigate dispatched 3")));
+    assert.ok(result.failures.some((failure) => failure.includes("lorex: dispatched 4")));
+    assert.ok(result.failures.some((failure) => failure.includes("established 2 connection")));
+});
+
+test("named minimum arguments reject ambiguous values", () => {
+    assert.deepEqual(parseNamedMinimum("lorex=2", "--minimum"), ["lorex", 2]);
+    assert.throws(() => parseNamedMinimum("lorex", "--minimum"), /name=minimum/);
+});
+
+test("identity manifest loader accepts the documented camera shape", (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "onvif-identities-"));
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+    const file = path.join(directory, "identities.json");
+    fs.writeFileSync(file, JSON.stringify({ cameras: [{
+        name: "Cam1",
+        mac: "02:00:00:00:00:01",
+        serialNumber: "SER1",
+        hardwareId: "HW1"
+    }] }));
+
+    assert.equal(readIdentityManifest(file)[0].name, "Cam1");
+});
+
+test("minimums cannot silently reference a missing recorder", () => {
+    const result = evaluateAcceptance(status(), {
+        minRecorderEvents: { missing: 1 },
+        minRecorderConnections: { missing: 2 }
+    });
+    assert.equal(result.passed, false);
+    assert.ok(result.failures.some((failure) => failure.includes("event minimum")));
+    assert.ok(result.failures.some((failure) => failure.includes("connection minimum")));
 });
 
 test("acceptance reports routing, lifecycle and connection failures", () => {
@@ -96,6 +155,10 @@ test("CLI arguments support 29-camera soak acceptance", () => {
         expectedCameras: 29,
         requireFrigate: true,
         requireRecorders: ["lorex", "nvr69"],
+        identityManifest: null,
+        minFrigateEvents: undefined,
+        minRecorderEvents: {},
+        minRecorderConnections: {},
         soakSeconds: 3600,
         intervalSeconds: 15,
         timeoutMs: 5000

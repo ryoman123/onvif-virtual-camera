@@ -43,6 +43,31 @@ function evaluateAcceptance(status, options = {}) {
         failures.push("camera names are not unique");
     }
 
+    const camerasByName = new Map(cameras.map((camera) => [camera.name, camera]));
+    if (
+        Array.isArray(options.expectedIdentities)
+        && cameras.length !== options.expectedIdentities.length
+    ) {
+        failures.push(
+            `identity manifest contains ${options.expectedIdentities.length} cameras, found ${cameras.length}`
+        );
+    }
+    for (const expected of options.expectedIdentities || []) {
+        const camera = camerasByName.get(expected.name);
+        if (!camera) {
+            failures.push(`expected camera identity '${expected.name}' is missing`);
+            continue;
+        }
+        for (const field of ["mac", "serialNumber", "hardwareId"]) {
+            const actual = field === "mac" ? camera.mac : camera.identity?.[field];
+            if (actual !== expected[field]) {
+                failures.push(
+                    `${expected.name}: identity.${field} expected '${expected[field]}', found '${actual ?? "missing"}'`
+                );
+            }
+        }
+    }
+
     for (const camera of cameras) {
         if (camera.state !== "running") {
             failures.push(`${camera.name}: state is '${camera.state}'`);
@@ -84,6 +109,14 @@ function evaluateAcceptance(status, options = {}) {
             }
         }
     }
+    if (Number.isInteger(options.minFrigateEvents)) {
+        const dispatched = analytics?.frigate?.eventsDispatched ?? 0;
+        if (dispatched < options.minFrigateEvents) {
+            failures.push(
+                `Frigate dispatched ${dispatched} event(s), expected at least ${options.minFrigateEvents}`
+            );
+        }
+    }
 
     const recorderNames = new Set(
         (analytics?.recorders || []).map((recorder) => recorder.name)
@@ -93,12 +126,40 @@ function evaluateAcceptance(status, options = {}) {
             failures.push(`required recorder '${required}' is missing`);
         }
     }
+    for (const name of Object.keys(options.minRecorderEvents || {})) {
+        if (!recorderNames.has(name)) {
+            failures.push(`event minimum references missing recorder '${name}'`);
+        }
+    }
+    for (const name of Object.keys(options.minRecorderConnections || {})) {
+        if (!recorderNames.has(name)) {
+            failures.push(`connection minimum references missing recorder '${name}'`);
+        }
+    }
     for (const recorder of analytics?.recorders || []) {
         if (recorder.client?.state !== "connected") {
             failures.push(`${recorder.name}: client state is '${recorder.client?.state}'`);
         }
         if (recorder.runtime?.state !== "connected") {
             failures.push(`${recorder.name}: runtime state is '${recorder.runtime?.state}'`);
+        }
+        const minimumEvents = options.minRecorderEvents?.[recorder.name];
+        if (Number.isInteger(minimumEvents)) {
+            const dispatched = recorder.runtime?.eventsDispatched ?? 0;
+            if (dispatched < minimumEvents) {
+                failures.push(
+                    `${recorder.name}: dispatched ${dispatched} event(s), expected at least ${minimumEvents}`
+                );
+            }
+        }
+        const minimumConnections = options.minRecorderConnections?.[recorder.name];
+        if (Number.isInteger(minimumConnections)) {
+            const connections = recorder.client?.connections ?? 0;
+            if (connections < minimumConnections) {
+                failures.push(
+                    `${recorder.name}: established ${connections} connection(s), expected at least ${minimumConnections}`
+                );
+            }
         }
     }
 
