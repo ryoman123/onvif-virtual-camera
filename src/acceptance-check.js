@@ -119,8 +119,10 @@ function evaluateAcceptance(status, options = {}) {
             if (analytics.frigate.state !== "connected") {
                 failures.push(`Frigate state is '${analytics.frigate.state}'`);
             }
-            if (analytics.frigate.available === false) {
-                failures.push("Frigate reports unavailable");
+            if (analytics.frigate.available !== true) {
+                failures.push(
+                    `Frigate availability is '${analytics.frigate.available ?? "unknown"}'`
+                );
             }
         }
     }

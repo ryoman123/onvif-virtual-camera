@@ -124,6 +124,14 @@ test("camera and analytics degradation affect readiness", () => {
         frigate: { state: "offline", available: false }
     })), false);
 
+    assert.equal(analyticsHealthy(analytics({
+        frigate: { state: "connected", available: null }
+    })), false);
+
+    assert.equal(analyticsHealthy(analytics({
+        frigate: { state: "connected", available: "offline" }
+    })), false);
+
     assert.equal(analyticsHealthy({
         frigate: null,
         recorders: [{

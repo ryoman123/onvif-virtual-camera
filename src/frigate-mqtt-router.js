@@ -15,7 +15,10 @@ class FrigateMqttRouter extends EventEmitter {
     route(topic, payload) {
         const value = Buffer.isBuffer(payload) ? payload.toString("utf8") : String(payload);
         if (topic === this.topicPrefix + "/available") {
-            this.available = value.trim().toLowerCase();
+            const availability = value.trim().toLowerCase();
+            this.available = availability === "online"
+                ? true
+                : availability === "offline" ? false : null;
             this.emit("availability", this.available);
             return [];
         }

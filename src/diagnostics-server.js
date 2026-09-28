@@ -22,7 +22,7 @@ function analyticsHealthy(analytics) {
     const frigate = analytics.frigate;
     if (frigate && (
         frigate.state !== "connected"
-        || frigate.available === false
+        || frigate.available !== true
     )) {
         return false;
     }

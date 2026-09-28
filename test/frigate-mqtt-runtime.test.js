@@ -102,7 +102,7 @@ test("MQTT runtime dispatches motion and object events to the ONVIF bus", () => 
     );
 
     const health = runtime.health();
-    assert.equal(health.available, "online");
+    assert.equal(health.available, true);
     assert.equal(health.messagesReceived, 3);
     assert.equal(health.eventsDispatched, 2);
     assert.equal(health.droppedMessages, 0);

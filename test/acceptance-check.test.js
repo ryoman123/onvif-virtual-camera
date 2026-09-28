@@ -99,6 +99,18 @@ test("acceptance requires Protect-facing PullPoint delivery evidence when reques
     assert.ok(result.failures.some((failure) => failure.includes("delivered 0 PullPoint message")));
 });
 
+test("acceptance requires positive Frigate availability evidence", () => {
+    for (const available of [false, null, "offline"]) {
+        const broken = status();
+        broken.analytics.frigate.available = available;
+
+        const result = evaluateAcceptance(broken, { requireFrigate: true });
+
+        assert.equal(result.passed, false);
+        assert.ok(result.failures.some((failure) => failure.includes("Frigate availability")));
+    }
+});
+
 test("named minimum arguments reject ambiguous values", () => {
     assert.deepEqual(parseNamedMinimum("lorex=2", "--minimum"), ["lorex", 2]);
     assert.throws(() => parseNamedMinimum("lorex", "--minimum"), /name=minimum/);
