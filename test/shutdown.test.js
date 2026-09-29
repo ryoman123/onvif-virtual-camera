@@ -17,6 +17,7 @@ test("CameraManager.stop clears monitoring and stops its ONVIF server once", asy
 
     let stops = 0;
     manager.monitorTimer = setInterval(() => {}, 100000);
+    manager.keepaliveTimer = setInterval(() => {}, 100000);
     manager.server = {
         async stop() {
             stops += 1;
@@ -27,6 +28,7 @@ test("CameraManager.stop clears monitoring and stops its ONVIF server once", asy
 
     assert.equal(stops, 1);
     assert.equal(manager.monitorTimer, null);
+    assert.equal(manager.keepaliveTimer, null);
     assert.equal(manager.server, null);
     assert.equal(manager.stopping, true);
 

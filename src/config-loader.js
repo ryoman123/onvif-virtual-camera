@@ -1,4 +1,5 @@
 const fs = require("fs");
+const net = require("node:net");
 const { spawnSync } = require("child_process");
 const yaml = require("js-yaml");
 const logger = require("./log-manager");
@@ -52,6 +53,12 @@ function getDefaultRuntime() {
         probe_streams: true,
         probe_timeout_ms: 15000,
         ip_monitor_interval_ms: 5000,
+        macvlan_keepalive: {
+            enabled: false,
+            targets: [],
+            interval_seconds: 60,
+            timeout_seconds: 3
+        },
         diagnostics: {
             enabled: true,
             host: "127.0.0.1",
@@ -133,6 +140,10 @@ function loadConfig(configPath) {
     const runtime = {
         ...defaultRuntime,
         ...(config.runtime || {}),
+        macvlan_keepalive: {
+            ...defaultRuntime.macvlan_keepalive,
+            ...((config.runtime && config.runtime.macvlan_keepalive) || {})
+        },
         diagnostics: {
             ...defaultRuntime.diagnostics,
             ...((config.runtime && config.runtime.diagnostics) || {})
@@ -143,6 +154,10 @@ function loadConfig(configPath) {
         }
     };
     validateRuntimeSettings(runtime);
+    runtime.macvlan_keepalive = Object.freeze({
+        ...runtime.macvlan_keepalive,
+        targets: Object.freeze([...runtime.macvlan_keepalive.targets])
+    });
     runtime.diagnostics = Object.freeze({ ...runtime.diagnostics });
     runtime.ws_security = Object.freeze({ ...runtime.ws_security });
     global.runtime = Object.freeze(runtime);
@@ -673,6 +688,45 @@ function validateRuntimeSettings(runtime) {
 
     normalizePositiveInteger(runtime.probe_timeout_ms, "runtime.probe_timeout_ms");
     normalizePositiveInteger(runtime.ip_monitor_interval_ms, "runtime.ip_monitor_interval_ms");
+
+    if (
+        !runtime.macvlan_keepalive ||
+        typeof runtime.macvlan_keepalive !== "object" ||
+        Array.isArray(runtime.macvlan_keepalive)
+    ) {
+        throw new Error("runtime.macvlan_keepalive must be an object.");
+    }
+    if (typeof runtime.macvlan_keepalive.enabled !== "boolean") {
+        throw new Error("runtime.macvlan_keepalive.enabled must be true or false.");
+    }
+    if (!Array.isArray(runtime.macvlan_keepalive.targets)) {
+        throw new Error("runtime.macvlan_keepalive.targets must be an array of IPv4 addresses.");
+    }
+
+    const seenKeepaliveTargets = new Set();
+    for (const target of runtime.macvlan_keepalive.targets) {
+        if (typeof target !== "string" || net.isIP(target.trim()) !== 4) {
+            throw new Error("runtime.macvlan_keepalive.targets must contain only IPv4 addresses.");
+        }
+        if (target !== target.trim()) {
+            throw new Error("runtime.macvlan_keepalive.targets must not contain surrounding whitespace.");
+        }
+        if (seenKeepaliveTargets.has(target)) {
+            throw new Error("runtime.macvlan_keepalive.targets must not contain duplicates.");
+        }
+        seenKeepaliveTargets.add(target);
+    }
+    if (runtime.macvlan_keepalive.enabled && runtime.macvlan_keepalive.targets.length === 0) {
+        throw new Error("runtime.macvlan_keepalive.targets must contain at least one target when enabled.");
+    }
+    normalizePositiveInteger(
+        runtime.macvlan_keepalive.interval_seconds,
+        "runtime.macvlan_keepalive.interval_seconds"
+    );
+    normalizePositiveInteger(
+        runtime.macvlan_keepalive.timeout_seconds,
+        "runtime.macvlan_keepalive.timeout_seconds"
+    );
 
     if (!runtime.diagnostics || typeof runtime.diagnostics !== "object" || Array.isArray(runtime.diagnostics)) {
         throw new Error("runtime.diagnostics must be an object.");

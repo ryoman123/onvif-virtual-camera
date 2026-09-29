@@ -34,6 +34,12 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  macvlan_keepalive:
+    enabled: false
+    targets:
+      - "192.168.1.51"
+    interval_seconds: 60
+    timeout_seconds: 3
   diagnostics:
     enabled: true
     host: "127.0.0.1"
@@ -50,6 +56,10 @@ runtime:
 - `probe_streams`: Probe source streams with `ffprobe` when a camera does not define `stream_hq` and `stream_lq` blocks.
 - `probe_timeout_ms`: Timeout for RTSP stream probing.
 - `ip_monitor_interval_ms`: Interval used to check for IP address changes due to DHCP.
+- `macvlan_keepalive.enabled`: Enables an optional per-camera interface-bound ICMP keepalive. It is disabled by default.
+- `macvlan_keepalive.targets`: One or more IPv4 addresses to ping from every virtual camera interface. Use the actual Protect NVR/client IP on the camera VLAN when applying the FDB-aging workaround.
+- `macvlan_keepalive.interval_seconds`: Interval between keepalive attempts for each virtual camera. Defaults to 60 seconds.
+- `macvlan_keepalive.timeout_seconds`: Per-ping response timeout. A missing reply is not treated as a bridge failure because transmitting the frame is sufficient for switch MAC learning.
 - `diagnostics.enabled`: Enables the read-only health/status listener. It is enabled by default.
 - `diagnostics.host`: Defaults to `127.0.0.1`, keeping the unauthenticated diagnostics listener local to the bridge host/container network namespace.
 - `diagnostics.port`: Defaults to `9090`.
@@ -408,6 +418,13 @@ The helper script:
 
 > [!WARNING]
 > MacVLANs are required for this project and they must be configured to match your config.yml exactly. Using the helper script is highly recommended.
+
+### Optional switch/FDB keepalive
+
+Some virtualized MacVLAN deployments have reported switch forwarding-table entries aging out even while an NVR is consuming a stream, producing unknown-unicast flooding until traffic is sent explicitly from each virtual interface toward the NVR. This is not expected on a healthy switching path and appears to be hardware/topology dependent. The workaround is therefore opt-in and is based on the field report in [Tony's ONVIF-RTSP-AI Proxy Server issue #63](https://github.com/BigTonyTones/Tonys-Onvf-RTSP-Server/issues/63).
+
+When enabled, the bridge runs a single interface-bound ICMP probe from each virtual camera interface to each configured target at the requested interval. Use an IPv4 literal for the real Protect NVR/client that receives the camera traffic, preferably on the same L2 camera VLAN. Do not enable it merely as a generic health check; the diagnostics counters expose attempts, replies, no-replies, and execution errors without making NVR reachability a camera-readiness dependency.
+
 
 ### Using the helper script for setup
 

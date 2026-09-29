@@ -3,6 +3,14 @@ runtime:
   probe_streams: true
   probe_timeout_ms: 15000
   ip_monitor_interval_ms: 5000
+  # Optional workaround for switch/FDB aging with MacVLAN virtual cameras.
+  # Leave disabled unless you have observed unknown-unicast flooding or similar.
+  macvlan_keepalive:
+    enabled: false
+    targets:
+      - "192.168.1.51"  # Protect NVR/client IP on the camera VLAN
+    interval_seconds: 60
+    timeout_seconds: 3
   diagnostics:
     enabled: true
     host: "127.0.0.1"

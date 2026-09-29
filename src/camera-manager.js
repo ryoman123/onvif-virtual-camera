@@ -14,6 +14,18 @@ class CameraManager {
         this.camera = null;
         this.server = null;
         this.monitorTimer = null;
+        this.keepaliveTimer = null;
+        this.keepaliveRunning = false;
+        this.keepaliveWarnedError = null;
+        this.keepaliveStats = {
+            attempts: 0,
+            replies: 0,
+            noReplies: 0,
+            errors: 0,
+            lastAttemptAt: null,
+            lastReplyAt: null,
+            lastError: null
+        };
         this.restarting = false;
         this.stopping = false;
         this.startedAt = null;
@@ -49,6 +61,17 @@ class CameraManager {
             rtsp: serverHealth?.rtsp || Object.freeze({
                 ready: false,
                 activeSessions: 0
+            }),
+            keepalive: Object.freeze({
+                enabled: global.runtime?.macvlan_keepalive?.enabled === true,
+                targetCount: global.runtime?.macvlan_keepalive?.targets?.length || 0,
+                attempts: this.keepaliveStats.attempts,
+                replies: this.keepaliveStats.replies,
+                noReplies: this.keepaliveStats.noReplies,
+                errors: this.keepaliveStats.errors,
+                lastAttemptAt: this.keepaliveStats.lastAttemptAt,
+                lastReplyAt: this.keepaliveStats.lastReplyAt,
+                lastError: this.keepaliveStats.lastError
             }),
             events: serverHealth?.events || Object.freeze({
                 topics: 0,
@@ -285,6 +308,99 @@ class CameraManager {
         logger.info(`Started IP monitoring for ${this.cameraConfig.name} (interval=${intervalMs}ms)`);
     }
 
+    async runMacvlanKeepalive() {
+        const config = global.runtime?.macvlan_keepalive;
+        if (!config?.enabled || !this.camera || this.keepaliveRunning) {
+            return;
+        }
+
+        this.keepaliveRunning = true;
+        const iface = this.camera.interface;
+
+        try {
+            for (const target of config.targets) {
+                this.keepaliveStats.attempts += 1;
+                this.keepaliveStats.lastAttemptAt = new Date().toISOString();
+
+                try {
+                    const result = await networkManager.pingFromInterface(
+                        iface,
+                        target,
+                        config.timeout_seconds
+                    );
+
+                    if (result.replied) {
+                        this.keepaliveStats.replies += 1;
+                        this.keepaliveStats.lastReplyAt = new Date().toISOString();
+                    } else {
+                        this.keepaliveStats.noReplies += 1;
+                    }
+
+                    if (this.keepaliveWarnedError) {
+                        logger.info(
+                            `MacVLAN keepalive recovered for ${this.cameraConfig.name} on ${iface}`
+                        );
+                        this.keepaliveWarnedError = null;
+                    }
+                    this.keepaliveStats.lastError = null;
+                } catch (error) {
+                    this.keepaliveStats.errors += 1;
+                    this.keepaliveStats.lastError = error.message;
+
+                    if (this.keepaliveWarnedError !== error.message) {
+                        logger.warn(
+                            `MacVLAN keepalive error for ${this.cameraConfig.name} ` +
+                            `on ${iface}: ${error.message}`
+                        );
+                        this.keepaliveWarnedError = error.message;
+                    }
+                }
+            }
+        } finally {
+            this.keepaliveRunning = false;
+        }
+    }
+
+    startMacvlanKeepalive() {
+        if (this.keepaliveTimer) {
+            return;
+        }
+
+        const config = global.runtime?.macvlan_keepalive;
+        if (!config?.enabled || config.targets.length === 0) {
+            logger.debug(
+                "network",
+                `MacVLAN NVR keepalive disabled for ${this.cameraConfig.name}`
+            );
+            return;
+        }
+
+        const intervalMs = config.interval_seconds * 1000;
+        this.keepaliveTimer = setInterval(() => {
+            this.runMacvlanKeepalive().catch((error) => {
+                logger.warn(
+                    `Unexpected MacVLAN keepalive failure for ${this.cameraConfig.name}: ${error.message}`
+                );
+            });
+        }, intervalMs);
+
+        if (typeof this.keepaliveTimer.unref === "function") {
+            this.keepaliveTimer.unref();
+        }
+
+        logger.info(
+            `Started MacVLAN NVR keepalive for ${this.cameraConfig.name} ` +
+            `(${config.targets.length} target(s), interval=${config.interval_seconds}s)`
+        );
+    }
+
+    stopMacvlanKeepalive() {
+        if (this.keepaliveTimer) {
+            clearInterval(this.keepaliveTimer);
+            this.keepaliveTimer = null;
+        }
+    }
+
     async stop() {
         if (this.stopping) {
             return;
@@ -296,6 +412,7 @@ class CameraManager {
             clearInterval(this.monitorTimer);
             this.monitorTimer = null;
         }
+        this.stopMacvlanKeepalive();
 
         const server = this.server;
         this.server = null;
@@ -318,6 +435,7 @@ class CameraManager {
         await this.server.start();
         this.startedAt = new Date().toISOString();
         this.startMonitoring();
+        this.startMacvlanKeepalive();
 
         logger.info(`ONVIF server started for ${camera.name} at ${camera.endpoints.deviceServiceUrl}`);
         return this.buildStartupSummary();

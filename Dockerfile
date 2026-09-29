@@ -6,7 +6,7 @@ FROM node:24-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --omit=dev
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg iputils
 COPY . .
 
 # -------------------------
