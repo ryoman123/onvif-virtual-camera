@@ -136,6 +136,66 @@ test("negative future clock skew is rejected", () => {
 });
 
 
+test("MacVLAN keepalive is opt-in, frozen, and defaults to no targets", () => {
+    const { runtime } = loadYaml(baseConfig());
+
+    assert.deepEqual(runtime.macvlan_keepalive, {
+        enabled: false,
+        targets: [],
+        interval_seconds: 60,
+        timeout_seconds: 3
+    });
+    assert.equal(Object.isFrozen(runtime.macvlan_keepalive), true);
+    assert.equal(Object.isFrozen(runtime.macvlan_keepalive.targets), true);
+});
+
+test("MacVLAN keepalive accepts explicit IPv4 NVR targets", () => {
+    const { runtime } = loadYaml(baseConfig(`
+  macvlan_keepalive:
+    enabled: true
+    targets:
+      - "192.0.2.51"
+      - "192.0.2.52"
+    interval_seconds: 45
+    timeout_seconds: 2`));
+
+    assert.deepEqual(runtime.macvlan_keepalive, {
+        enabled: true,
+        targets: ["192.0.2.51", "192.0.2.52"],
+        interval_seconds: 45,
+        timeout_seconds: 2
+    });
+});
+
+test("MacVLAN keepalive rejects unsafe or incomplete target configuration", () => {
+    assert.throws(
+        () => loadYaml(baseConfig(`
+  macvlan_keepalive:
+    enabled: true
+    targets: []`)),
+        /must contain at least one target when enabled/
+    );
+
+    assert.throws(
+        () => loadYaml(baseConfig(`
+  macvlan_keepalive:
+    enabled: true
+    targets:
+      - "protect.local"`)),
+        /must contain only IPv4 addresses/
+    );
+
+    assert.throws(
+        () => loadYaml(baseConfig(`
+  macvlan_keepalive:
+    enabled: true
+    targets:
+      - "192.0.2.51"
+      - "192.0.2.51"`)),
+        /must not contain duplicates/
+    );
+});
+
 test("diagnostics defaults are local-only and frozen", () => {
     const { runtime } = loadYaml(baseConfig());
 
